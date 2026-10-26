@@ -30,8 +30,7 @@ public class WaveManager : MonoBehaviour
 
     [Header("UI")]
     public TMP_Text statusText;
-    // public GearPullManager gearPullManager;
-    // uncomment this when implementing everything
+    public GearPullManager gearPullManager;
     public float autoContinueDelay = 2f; // wait time between waves when there is no gear screen
 
     [Header("Optional Events")]
@@ -45,6 +44,12 @@ public class WaveManager : MonoBehaviour
     private bool finishedSpawning = false;
     private bool movePlayerToNextArea = false;
     private bool gameOver = false;
+
+    private bool waitingForGearSelection = false;
+    public bool IsWaitingForGearSelection
+    {
+        get { return waitingForGearSelection; }
+    }
 
     void Awake()
     {
@@ -113,10 +118,14 @@ public class WaveManager : MonoBehaviour
 
     private void WaveCompleted()
     {
-        if (gameOver) return;
+        if (gameOver || waitingForGearSelection)
+            return;
 
-        bool lastWaveOfLevel = currentWaveIndex >= gameLevels[currentLevelIndex].waves.Length - 1;
-        bool lastLevel = currentLevelIndex >= gameLevels.Length - 1;
+        bool lastWaveOfLevel =
+            currentWaveIndex >= gameLevels[currentLevelIndex].waves.Length - 1;
+
+        bool lastLevel =
+            currentLevelIndex >= gameLevels.Length - 1;
 
         if (lastWaveOfLevel && lastLevel)
         {
@@ -138,29 +147,24 @@ public class WaveManager : MonoBehaviour
             movePlayerToNextArea = true;
         }
 
-        // ADD this instead of StartCoroutine(AutoContinue()); after gearPull is added
-        // if (gearPullManager != null)
-        // {
-        //      gearPullManager.OpenPull();   // its ClosePull() calls ContinueToNextWave()
-        // }
-        // else
-        // {
-        //      StartCoroutine(AutoContinue());
-        // }
-        StartCoroutine(AutoContinue());
+        waitingForGearSelection = true;
 
-    }
-
-    IEnumerator AutoContinue()
-    {
-        yield return new WaitForSeconds(autoContinueDelay);
-        ContinueToNextWave();
+        if (gearPullManager != null)
+        {
+            gearPullManager.ShowOpenButton();
+        }
     }
 
     // called by the gear screen when the player closes it
     public void ContinueToNextWave()
     {
-        if (gameOver) return;
+        if (gameOver || !waitingForGearSelection)
+            return;
+
+        waitingForGearSelection = false;
+
+        if (gearPullManager != null)
+            gearPullManager.HideOpenButton();
 
         if (movePlayerToNextArea)
         {
