@@ -5,6 +5,7 @@ using TMPro;
 public class GearPullManager : MonoBehaviour
 {
     [Header("UI References")]
+    [SerializeField] private GameObject _openGearPullContainer;
     [SerializeField] private GameObject _gearPullPanel;
     [SerializeField] private Button[] _rewardButtons;
     [SerializeField] private Button _skipButton;
@@ -21,7 +22,11 @@ public class GearPullManager : MonoBehaviour
 
     private void Awake()
     {
-        _gearPullPanel.SetActive(false);
+        if (_openGearPullContainer != null)
+            _openGearPullContainer.SetActive(false);
+
+        if (_gearPullPanel != null)
+            _gearPullPanel.SetActive(false);
 
         for (int i = 0; i < _rewardButtons.Length; i++)
         {
@@ -40,9 +45,7 @@ public class GearPullManager : MonoBehaviour
                 _rewardButtons[i].GetComponentInChildren<TMP_Text>(true);
 
             if (rewardText != null)
-            {
                 rewardText.text = _rewards[i];
-            }
 
             _rewardButtons[i].onClick.AddListener(
                 () => SelectReward(index)
@@ -50,19 +53,24 @@ public class GearPullManager : MonoBehaviour
         }
 
         if (_skipButton != null)
-        {
             _skipButton.onClick.AddListener(SkipReward);
-        }
 
-        // Temporary button to open the reward screen.
         if (_openButton != null)
-        {
             _openButton.onClick.AddListener(OpenPull);
-        }
     }
     public void OpenPull()
     {
-        _gearPullPanel.SetActive(true);
+        if (WaveManager.Instance == null ||
+            !WaveManager.Instance.IsWaitingForGearSelection)
+        {
+            return;
+        }
+
+        if (_openGearPullContainer != null)
+            _openGearPullContainer.SetActive(false);
+
+        if (_gearPullPanel != null)
+            _gearPullPanel.SetActive(true);
     }
     public void SelectReward(int index)
     {
@@ -78,6 +86,23 @@ public class GearPullManager : MonoBehaviour
     }
     private void ClosePull()
     {
-        _gearPullPanel.SetActive(false);
+        if (_gearPullPanel != null)
+            _gearPullPanel.SetActive(false);
+
+        if (_openGearPullContainer != null)
+            _openGearPullContainer.SetActive(false);
+
+        if (WaveManager.Instance != null)
+            WaveManager.Instance.ContinueToNextWave();
+    }
+    public void ShowOpenButton()
+    {
+        if (_openGearPullContainer != null)
+            _openGearPullContainer.SetActive(true);
+    }
+public void HideOpenButton()
+    {
+        if (_openGearPullContainer != null)
+            _openGearPullContainer.SetActive(false);
     }
 }
