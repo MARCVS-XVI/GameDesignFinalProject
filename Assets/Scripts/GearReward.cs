@@ -5,7 +5,7 @@ public enum RewardKind { Equipment, Effect }
 public enum GearSlot { Sword, Shield, Armor }
 public enum RewardRarity { Common, Rare, Legendary, Mythic }
 [CreateAssetMenu(fileName = "NewGearReward", menuName = "Gear/Effect Reward")]
-public class GearReward : MonoBehaviour
+public class GearReward : ScriptableObject
 {
     public string rewardName = "New Reward";
     [TextArea(2, 4)] public string description;
