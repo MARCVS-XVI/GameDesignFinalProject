@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
-
 public class PlayerController : MonoBehaviour
 {
     [Header("Main Camera")]
@@ -9,23 +8,38 @@ public class PlayerController : MonoBehaviour
     [Header("Player Movement")]
     [SerializeField] private float speed;
     [SerializeField] private GameObject mainWeapon;
-    [Header("Player Attack")]
+
+    private InputAction mouseDir;
+    private InputAction inputMoveDir;
+    private Vector2 movementDir;
+
+    [Header("Player Sword")]
+    [SerializeField] private float swordWeight = 50f;
+    [SerializeField] private float maxSwordInirtiaAddition = 5.0f;
+    [SerializeField] private float swordInertiaDecay = 18f;
+
+    private Quaternion prevSwordRotation;
+    private Vector3 swordInertia;
+    private float prevSwingSpeed;
+    [Header("Player Gear")]
     [SerializeField] private GameObject gearAttack1;
     [SerializeField] private GameObject gearAttack2;
     [SerializeField] private GameObject gearAttack3;    
 
-    private InputAction mouseDir;
-    private InputAction inputMoveDir;
 
-    private Vector2 movementDir;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
     {
         mouseDir = InputSystem.actions.FindAction("MousePos");
         inputMoveDir = InputSystem.actions.FindAction("Move");
+
+        prevSwordRotation = mainWeapon.transform.rotation;
+        swordInertia = Vector3.zero;
+        prevSwingSpeed = 0.0f;
     }
 
-    void FaceMouse()
+    //sword faces mouse
+    void SwordFaceMouse()
     {
         if (Mouse.current == null || mainCam == null)
             return;
@@ -44,22 +58,51 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private Vector3 GetSwordWeightTrans()
+    {
+        float dt = Time.deltaTime;
+        float swingSpeed = Quaternion.Angle(prevSwordRotation, mainWeapon.transform.rotation) * Mathf.Deg2Rad / dt;
+        prevSwordRotation = mainWeapon.transform.rotation;
+
+        // Player's forward direction 
+        Vector3 forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+        
+        swordInertia *= Mathf.Exp(-swordInertiaDecay * dt);
+
+        //testing clamp version
+        swingSpeed = Mathf.Clamp(swingSpeed, 0.0f, 100.0f);
+
+        if(swingSpeed < prevSwingSpeed)
+        {
+    
+            Vector3 addToSwordInirtia = forward * Mathf.Sin(Mathf.PI /2.0f * 0.01f*(prevSwingSpeed - swingSpeed)) * swordWeight * 10.0f * dt;
+            if(addToSwordInirtia.magnitude > maxSwordInirtiaAddition)
+            {
+                addToSwordInirtia *= maxSwordInirtiaAddition/addToSwordInirtia.magnitude;
+            }
+            swordInertia += addToSwordInirtia;
+        }
+        // Faster swings produce a stronger forward pull.
+        prevSwingSpeed = swingSpeed;
+        return swordInertia;
+    }
+
     private void Movement()
     {
+        //player input movement
         movementDir = inputMoveDir.ReadValue<Vector2>();
-        if(movementDir.x == 0 && movementDir.y ==0)
-        {return;}
         movementDir.Normalize();
         Vector3 playerTrans = new Vector3(movementDir.x * speed * Time.deltaTime, 0, movementDir.y * speed * Time.deltaTime);
-        transform.Translate(playerTrans, Space.World);
+
+        transform.Translate(playerTrans + GetSwordWeightTrans() * Time.deltaTime, Space.World);
     }
 
 
     // Update is called once per frame
     void Update()
     {
-            
-        FaceMouse();
+        //should be ordered swordFaceMouse then Movement    
+        SwordFaceMouse();
         Movement();
     }
 }
