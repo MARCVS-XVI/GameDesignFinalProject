@@ -15,7 +15,8 @@ public class Wave
 public class Level
 {
     public string levelName;
-    public Transform playerStartPoint; // where player is moved to after level - REMOVE after prototype?
+    public Transform playerStartPoint;
+    public Door[] exitDoors;
     public Transform[] spawnPoints;
     public Wave[] waves;
 }
@@ -42,7 +43,13 @@ public class WaveManager : MonoBehaviour
     private int currentWaveIndex = 0;
     private int enemiesAlive = 0;
     private bool finishedSpawning = false;
-    private bool movePlayerToNextArea = false;
+    
+    [Header("Area Progression")]
+    public float areaStartDelay = 3f;
+
+    private bool awaitingAreaEntry = false;
+    private bool playerEnteredArea = false;
+
     private bool gameOver = false;
 
     private bool waitingForGearSelection = false;
@@ -142,9 +149,18 @@ public class WaveManager : MonoBehaviour
         {
             OnLevelComplete.Invoke();
 
+            // open the doors of the room that was just cleared
+            foreach (Door door in gameLevels[currentLevelIndex].exitDoors)
+            {
+                if (door != null) door.Open();
+            }
+
             currentLevelIndex++;
             currentWaveIndex = 0;
-            movePlayerToNextArea = true;
+
+            awaitingAreaEntry = true;
+            playerEnteredArea = false;
+            ShowStatus("Area cleared! Head through the door.");
         }
 
         waitingForGearSelection = true;
@@ -166,12 +182,39 @@ public class WaveManager : MonoBehaviour
         if (gearPullManager != null)
             gearPullManager.HideOpenButton();
 
-        if (movePlayerToNextArea)
+        if (awaitingAreaEntry)
         {
-            movePlayerToNextArea = false;
-            MovePlayerToCurrentArea();
+            // don't start anything yet, the player has to walk into the next room
+            TryBeginNextArea();
+            return;
         }
 
+        StartWave();
+    }
+
+    // called by AreaTrigger when the player walks into a room
+    public void PlayerEnteredArea(int levelIndex)
+    {
+        if (!awaitingAreaEntry || levelIndex != currentLevelIndex) return;
+
+        playerEnteredArea = true;
+        TryBeginNextArea();
+    }
+
+    // starts the next area only once the player is inside AND the gear screen is closed
+    private void TryBeginNextArea()
+    {
+        if (gameOver || !awaitingAreaEntry || !playerEnteredArea || waitingForGearSelection)
+            return;
+
+        awaitingAreaEntry = false;
+        StartCoroutine(StartWaveAfterDelay());
+    }
+
+    IEnumerator StartWaveAfterDelay()
+    {
+        ShowStatus("Get ready...");
+        yield return new WaitForSeconds(areaStartDelay);
         StartWave();
     }
 
