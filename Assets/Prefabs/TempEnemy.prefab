@@ -12,8 +12,8 @@ GameObject:
   - component: {fileID: 4680409687937198303}
   - component: {fileID: 2722278317809408039}
   - component: {fileID: 1291525152211481722}
-  - component: {fileID: 7068655348966933202}
   - component: {fileID: 4415591911992882120}
+  - component: {fileID: -630078589890044040}
   m_Layer: 0
   m_Name: TempEnemy
   m_TagString: Enemy
@@ -116,20 +116,6 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &7068655348966933202
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3316355382207161437}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc6180d006c6c8e4e8b64e32f91c716e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TempEnemyManager
-  health: 3
-  moveSpeed: 3
 --- !u!54 &4415591911992882120
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -157,3 +143,25 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &-630078589890044040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3316355382207161437}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48bcbc89afad0504080cbac2aea8464a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyManager
+  maxHealth: 3
+  moveSpeed: 3
+  contactDamage: 1
+  attackCooldown: 1
+  dieOnContact: 0
+  defaultGearDamage: 1
+  hitCooldown: 0.4
+  barOffset: {x: 0, y: 2.2, z: 0}
+  barSize: {x: 1.2, y: 0.15}
+  debugLogs: 1
