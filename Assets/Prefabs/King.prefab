@@ -927,9 +927,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48bcbc89afad0504080cbac2aea8464a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyManager
-  maxHealth: 100
+  maxHealth: 50
   moveSpeed: 3
-  contactDamage: 4
+  contactDamage: 1
   attackCooldown: 1
   dieOnContact: 0
   defaultGearDamage: 1

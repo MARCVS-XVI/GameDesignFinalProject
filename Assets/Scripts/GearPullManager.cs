@@ -126,6 +126,8 @@ public class GearPullManager : MonoBehaviour
         {
             _gearPullPanel.SetActive(false);
         }
+
+        SetArea(GameArea.CastleExterior);
     }
 
     private void OnDisable()
@@ -366,6 +368,7 @@ public class GearPullManager : MonoBehaviour
         _isOpen = false;
 
         _gearPullPanel.SetActive(false);
+        HideOpenButton();
 
         if (_pauseGameplay)
         {
@@ -373,6 +376,11 @@ public class GearPullManager : MonoBehaviour
         }
 
         PullClosed?.Invoke(skipped);
+
+        if (WaveManager.Instance != null)
+        {
+            WaveManager.Instance.ContinueToNextWave();
+        }
     }
 
     private void AddOption(

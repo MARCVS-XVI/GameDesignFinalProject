@@ -157,9 +157,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyManager
   maxHealth: 10
   moveSpeed: 3
-  contactDamage: 2
+  contactDamage: 1
   attackCooldown: 1
-  dieOnContact: 1
+  dieOnContact: 0
   defaultGearDamage: 1
   hitCooldown: 0.4
   barOffset: {x: 0, y: 2.2, z: 0}

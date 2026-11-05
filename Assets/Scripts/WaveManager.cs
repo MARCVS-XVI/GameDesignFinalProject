@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using System.Collections;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 [System.Serializable]
 public class Wave
@@ -33,6 +34,7 @@ public class WaveManager : MonoBehaviour
     public TMP_Text statusText;
     public GearPullManager gearPullManager;
     public float autoContinueDelay = 2f; // unused at the moment
+    public GameObject restartPanel;
 
     [Header("Optional Events")]
     public UnityEvent OnWaveComplete;
@@ -101,9 +103,21 @@ public class WaveManager : MonoBehaviour
         Instance = this;
     }
 
+    private GearPullManager.GameArea AreaForLevel(int levelIndex)
+    {
+        switch (levelIndex)
+        {
+            case 0:  return GearPullManager.GameArea.CastleExterior;
+            case 1:  return GearPullManager.GameArea.CastleInterior;
+            default: return GearPullManager.GameArea.ThroneRoom;
+        }
+    }
+
     // starts the wave manager
     void Start()
     {
+        if (restartPanel != null) restartPanel.SetActive(false);
+
         // find the player object
         if (player == null)
         {
@@ -134,6 +148,12 @@ public class WaveManager : MonoBehaviour
 
         // show current status in logs
         Level currentLevel = gameLevels[currentLevelIndex];
+
+        if (gearPullManager != null)
+        {
+            gearPullManager.SetArea(AreaForLevel(currentLevelIndex));
+        }
+
         Log("StartWave -> '" + currentLevel.levelName + "' wave " + (currentWaveIndex + 1) + "/" + currentLevel.waves.Length +
             " (" + currentLevel.waves[currentWaveIndex].numberOfEnemies + " enemies)");
 
@@ -373,6 +393,7 @@ public class WaveManager : MonoBehaviour
         Log("GAME WON");
         ShowStatus("You are the new king!");
         OnGameWon.Invoke();
+        if (restartPanel != null) restartPanel.SetActive(true);
     }
 
     // loses the game and called from PlayerHealth when the player dies
@@ -383,6 +404,7 @@ public class WaveManager : MonoBehaviour
         Log("PlayerDied. Stopping all coroutines. " + State());
         StopAllCoroutines();
         ShowStatus("You died...");
+        if (restartPanel != null) restartPanel.SetActive(true);
     }
 
     // shows a status message
@@ -392,5 +414,11 @@ public class WaveManager : MonoBehaviour
         {
             statusText.text = message;
         }
+    }
+
+    public void RestartGame()
+    {
+        Time.timeScale = 1f; // in case the game was paused
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
