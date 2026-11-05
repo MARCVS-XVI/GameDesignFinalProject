@@ -929,7 +929,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyManager
   maxHealth: 100
   moveSpeed: 3
-  contactDamage: 2
+  contactDamage: 4
   attackCooldown: 1
   dieOnContact: 0
   defaultGearDamage: 1
