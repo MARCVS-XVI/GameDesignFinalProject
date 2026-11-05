@@ -1724,9 +1724,32 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GearPullManager
   _gearPullPanel: {fileID: 863205731}
-  _rewardButtons: []
-  _skipButton: {fileID: 300114711}
-  _openButton: {fileID: 1598459534}
+  _cards: []
+  _pauseGameplay: 1
+  _openButton: {fileID: 0}
+  _rewardPool:
+  - {fileID: 11400000, guid: 4e6761988edc62740add9847c985adb7, type: 2}
+  _demoLoadout: {fileID: 0}
+  _offerGearAndEffect: 1
+  _castleExteriorScene: CastleExterior
+  _castleInteriorScene: CastleInterior
+  _throneRoomScene: ThroneRoom
+  _exteriorRates:
+    common: 55
+    rare: 30
+    legendary: 15
+    mythic: 0
+  _interiorRates:
+    common: 45
+    rare: 40
+    legendary: 10
+    mythic: 5
+  _throneRates:
+    common: 30
+    rare: 20
+    legendary: 30
+    mythic: 20
+  _skipsForGuaranteedHighRarity: 2
 --- !u!1 &1598459532
 GameObject:
   m_ObjectHideFlags: 0
