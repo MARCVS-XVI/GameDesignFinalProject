@@ -159,7 +159,7 @@ MonoBehaviour:
   moveSpeed: 3
   contactDamage: 1
   attackCooldown: 1
-  dieOnContact: 0
+  dieOnContact: 1
   defaultGearDamage: 1
   hitCooldown: 0.4
   barOffset: {x: 0, y: 2.2, z: 0}
