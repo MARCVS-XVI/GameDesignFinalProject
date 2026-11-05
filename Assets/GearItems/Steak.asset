@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Steak
   m_EditorClassIdentifier: Assembly-CSharp::GearReward
   rewardName: Steak
-  description: 
+  description: +5% Health
   kind: 1
   rarity: 0
   slot: 3

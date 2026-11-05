@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Beserk Rune
   m_EditorClassIdentifier: Assembly-CSharp::GearReward
   rewardName: Beserk Rune
-  description: 
+  description: +100% Attack
   kind: 1
   rarity: 2
   slot: 3
