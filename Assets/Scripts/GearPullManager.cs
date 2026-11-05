@@ -587,4 +587,5 @@ public class GearPullManager : MonoBehaviour
             _openButton.SetActive(false);
         }
     }
+
     }
