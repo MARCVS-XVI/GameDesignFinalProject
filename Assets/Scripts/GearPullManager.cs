@@ -61,6 +61,7 @@ public class GearPullManager : MonoBehaviour
     [SerializeField] private GameObject _gearPullPanel;
     [SerializeField] private GearRewardCard[] _cards;
     [SerializeField] private bool _pauseGameplay = true;
+    [SerializeField] private GameObject _openButton;
 
     [Header("Rewards")]
     [SerializeField] private GearReward[] _rewardPool;
@@ -326,6 +327,25 @@ public class GearPullManager : MonoBehaviour
         ClosePull(false);
     }
 
+    public void SelectReward(int rewardIndex)
+    {
+        if (rewardIndex < 0 ||
+            rewardIndex >= _offered.Count)
+        {
+            Debug.LogWarning(
+                "GearPullManager: Invalid reward index: " +
+                rewardIndex
+            );
+
+            return;
+        }
+
+        GearReward selectedReward =
+            _offered[rewardIndex];
+
+        SelectReward(selectedReward);
+    }
+
     public void SkipPull()
     {
         if (!_isOpen)
@@ -552,4 +572,19 @@ public class GearPullManager : MonoBehaviour
                 return _exteriorRates;
         }
     }
-}
+    public void ShowOpenButton()
+    {
+        if (_openButton != null)
+        {
+            _openButton.SetActive(true);
+        }
+    }
+
+    public void HideOpenButton()
+    {
+        if (_openButton != null)
+        {
+            _openButton.SetActive(false);
+        }
+    }
+    }
