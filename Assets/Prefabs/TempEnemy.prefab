@@ -155,11 +155,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48bcbc89afad0504080cbac2aea8464a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyManager
-  maxHealth: 3
+  maxHealth: 10
   moveSpeed: 3
-  contactDamage: 1
+  contactDamage: 2
   attackCooldown: 1
-  dieOnContact: 0
+  dieOnContact: 1
   defaultGearDamage: 1
   hitCooldown: 0.4
   barOffset: {x: 0, y: 2.2, z: 0}
