@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class GearPullManager : MonoBehaviour
 {
@@ -68,15 +67,13 @@ public class GearPullManager : MonoBehaviour
     [SerializeField] private GearLoadout _demoLoadout;
     [SerializeField] private bool _offerGearAndEffect = true;
 
-    [Header("Unity Scene Names")]
+    [Header("Current Area (Single Scene)")]
+    [Tooltip("Area at the beginning of a run. All areas can live in the same Unity scene.")]
     [SerializeField]
-    private string _castleExteriorScene = "CastleExterior";
+    private GameArea _startingArea =
+        GameArea.CastleExterior;
 
-    [SerializeField]
-    private string _castleInteriorScene = "CastleInterior";
-
-    [SerializeField]
-    private string _throneRoomScene = "ThroneRoom";
+    public GameArea CurrentArea { get; private set; }
 
     [Header("Castle Exterior Rarity Chances (%)")]
     [SerializeField]
@@ -97,27 +94,61 @@ public class GearPullManager : MonoBehaviour
     [Min(1)]
     [SerializeField]
     private int _skipsForGuaranteedHighRarity = 2;
+
     public event Action<GearReward> RewardSelected;
     public event Action<bool> PullClosed;
+
     public bool IsOpen => _isOpen;
     public int ConsecutiveSkips => _consecutiveSkips;
+
     private readonly List<GearReward> _offered =
         new List<GearReward>();
+
     private bool _isOpen;
     private int _consecutiveSkips;
     private float _oldTimeScale = 1f;
-    private bool _hasAreaOverride;
-    private GameArea _areaOverride;
 
     public void SetArea(GameArea area)
     {
-        _hasAreaOverride = true;
-        _areaOverride = area;
+        if (!Enum.IsDefined(typeof(GameArea), area))
+        {
+            Debug.LogWarning(
+                "GearPullManager: Invalid area " + area,
+                this
+            );
+            return;
+        }
+
+        CurrentArea = area;
+
+        Debug.Log(
+            "GearPullManager: Current area is " +
+            CurrentArea,
+            this
+        );
     }
 
     public void ClearAreaOverride()
     {
-        _hasAreaOverride = false;
+        SetArea(_startingArea);
+    }
+
+    [ContextMenu("Set Area/Castle Exterior")]
+    public void SetCastleExterior()
+    {
+        SetArea(GameArea.CastleExterior);
+    }
+
+    [ContextMenu("Set Area/Castle Interior")]
+    public void SetCastleInterior()
+    {
+        SetArea(GameArea.CastleInterior);
+    }
+
+    [ContextMenu("Set Area/Throne Room")]
+    public void SetThroneRoom()
+    {
+        SetArea(GameArea.ThroneRoom);
     }
 
     private void Awake()
@@ -127,7 +158,7 @@ public class GearPullManager : MonoBehaviour
             _gearPullPanel.SetActive(false);
         }
 
-        SetArea(GameArea.CastleExterior);
+        SetArea(_startingArea);
     }
 
     private void OnDisable()
@@ -152,13 +183,11 @@ public class GearPullManager : MonoBehaviour
             Debug.LogError(
                 "GearPullManager: Assign the panel and cards."
             );
-
             return;
         }
 
-        if (!TryGetArea(out GameArea area))
-            return;
-
+        // Get rarity rates from the current area.
+        GameArea area = CurrentArea;
         RarityRates rates = GetRates(area);
 
         if (rates.Total != 100)
@@ -169,6 +198,7 @@ public class GearPullManager : MonoBehaviour
                 "relative weights."
             );
         }
+
 
         List<GearReward> available =
             new List<GearReward>();
@@ -191,7 +221,6 @@ public class GearPullManager : MonoBehaviour
                 "GearPullManager: Add GearReward " +
                 "assets to the Reward Pool."
             );
-
             return;
         }
 
@@ -202,7 +231,6 @@ public class GearPullManager : MonoBehaviour
                 "GearPullManager: No eligible rewards " +
                 "for area " + area
             );
-
             return;
         }
 
@@ -268,7 +296,6 @@ public class GearPullManager : MonoBehaviour
             Debug.LogError(
                 "GearPullManager: Failed to roll rewards."
             );
-
             return;
         }
 
@@ -293,7 +320,6 @@ public class GearPullManager : MonoBehaviour
         Debug.Log("Gear Pull area: " + area);
 
         _oldTimeScale = Time.timeScale;
-
         _isOpen = true;
 
         _gearPullPanel.SetActive(true);
@@ -338,7 +364,6 @@ public class GearPullManager : MonoBehaviour
                 "GearPullManager: Invalid reward index: " +
                 rewardIndex
             );
-
             return;
         }
 
@@ -377,6 +402,7 @@ public class GearPullManager : MonoBehaviour
 
         PullClosed?.Invoke(skipped);
 
+        // Preserve existing WaveManager integration.
         if (WaveManager.Instance != null)
         {
             WaveManager.Instance.ContinueToNextWave();
@@ -440,6 +466,7 @@ public class GearPullManager : MonoBehaviour
         if (eligible.Count == 0)
             return null;
 
+        // Calculate total available rarity weight.
         int totalWeight = 0;
 
         for (int i = 0; i < 4; i++)
@@ -455,6 +482,7 @@ public class GearPullManager : MonoBehaviour
         if (totalWeight <= 0)
             return null;
 
+        // Roll a random rarity.
         float roll =
             UnityEngine.Random.value * totalWeight;
 
@@ -522,47 +550,6 @@ public class GearPullManager : MonoBehaviour
         return false;
     }
 
-    private bool TryGetArea(out GameArea area)
-    {
-        if (_hasAreaOverride)
-        {
-            area = _areaOverride;
-            return true;
-        }
-
-        string sceneName =
-            SceneManager.GetActiveScene().name;
-
-        if (sceneName == _castleExteriorScene)
-        {
-            area = GameArea.CastleExterior;
-            return true;
-        }
-
-        if (sceneName == _castleInteriorScene)
-        {
-            area = GameArea.CastleInterior;
-            return true;
-        }
-
-        if (sceneName == _throneRoomScene)
-        {
-            area = GameArea.ThroneRoom;
-            return true;
-        }
-
-        area = default(GameArea);
-
-        Debug.LogError(
-            "GearPullManager: Scene '" + sceneName +
-            "' is not mapped to an area. " +
-            "Set the scene names in the Inspector " +
-            "or call SetArea()."
-        );
-
-        return false;
-    }
-
     private RarityRates GetRates(GameArea area)
     {
         switch (area)
@@ -580,6 +567,7 @@ public class GearPullManager : MonoBehaviour
                 return _exteriorRates;
         }
     }
+
     public void ShowOpenButton()
     {
         if (_openButton != null)
@@ -595,5 +583,4 @@ public class GearPullManager : MonoBehaviour
             _openButton.SetActive(false);
         }
     }
-
-    }
+}
