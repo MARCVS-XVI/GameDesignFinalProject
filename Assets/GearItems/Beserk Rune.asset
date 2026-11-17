@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Beserk Rune
   m_EditorClassIdentifier: Assembly-CSharp::GearReward
   rewardName: Beserk Rune
-  description: +100% Attack
+  description: Attack is doubled for 1 wave.
   kind: 1
   rarity: 2
   slot: 3
@@ -22,6 +22,9 @@ MonoBehaviour:
   bonusHP: 0
   bonusAttack: 0
   bonusDefense: 0
-  specialEffect: 7
+  specialEffect: 6
   effectValue: 100
+  durationType: 2
+  durationSeconds: 15
+  durationWaves: 1
   restoreHP: 0

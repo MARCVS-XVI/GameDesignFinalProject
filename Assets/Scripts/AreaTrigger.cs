@@ -10,26 +10,68 @@ public class AreaTrigger : MonoBehaviour
     private GearPullManager.GameArea _area =
         GearPullManager.GameArea.CastleInterior;
 
-    // reset the collider to be a trigger
+    [Header("Optional Wave Manager")]
+    [SerializeField]
+    private WaveManager _waveManager;
+
+    [SerializeField]
+    private bool _debugLogs = true;
+
     private void Reset()
     {
-        GetComponent<Collider>().isTrigger = true;
+        Collider collider = GetComponent<Collider>();
+
+        if (collider != null)
+            collider.isTrigger = true;
     }
 
-    // handle player entering, staying, and exiting the area
     private void OnTriggerEnter(Collider other)
     {
-        if (other.GetComponentInParent<PlayerController>() == null)
-            return;
-
-        if (_gearPullManager == null)
+        if (other.GetComponentInParent<PlayerController>() == null &&
+            other.GetComponentInParent<PlayerHealth>() == null)
         {
-            Debug.LogWarning(
-                "GearAreaTrigger: Assign GearPullManager.",
+            return;
+        }
+
+        WaveManager manager = _waveManager != null
+            ? _waveManager
+            : WaveManager.Instance;
+
+        if (manager == null)
+        {
+            Debug.LogError(
+                "[AreaTrigger] No WaveManager found.",
                 this
             );
             return;
         }
-        _gearPullManager.SetArea(_area);
+
+        int levelIndex = (int)_area;
+
+        bool expected =
+            manager.IsAwaitingArea(levelIndex);
+
+        if (_debugLogs)
+        {
+            Debug.Log(
+                "[AreaTrigger] Player entered '" +
+                name + "'. Destination=" + _area +
+                ", expected by WaveManager=" + expected,
+                this
+            );
+        }
+
+        manager.PlayerEnteredArea(levelIndex);
+
+        if (!expected)
+            return;
+
+        GearPullManager pull =
+            _gearPullManager != null
+                ? _gearPullManager
+                : manager.gearPullManager;
+
+        if (pull != null)
+            pull.SetArea(_area);
     }
 }

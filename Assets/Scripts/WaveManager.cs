@@ -7,9 +7,21 @@ using UnityEngine.SceneManagement;
 [System.Serializable]
 public class Wave
 {
+    [Min(0)]
     public int numberOfEnemies;
+
+    [Min(0f)]
     public float spawnDelay = 0.5f;
+
     public GameObject enemyPrefab;
+
+    [Header("Enemy Stats For This Wave")]
+
+    [Min(1f)]
+    public float enemyMaxHealth = 10f;
+
+    [Min(0f)]
+    public float enemyAttackDamage = 1f;
 }
 
 [System.Serializable]
@@ -30,10 +42,18 @@ public class WaveManager : MonoBehaviour
     public Level[] gameLevels;
     public Transform player;
 
+    [Header("Gear Effect Integration")]
+    [Tooltip(
+        "Assign the GearLoadout on the real Player. " +
+        "If empty, searches the Player hierarchy."
+    )]
+    [SerializeField]
+    private GearLoadout playerGearLoadout;
+
     [Header("UI")]
     public TMP_Text statusText;
     public GearPullManager gearPullManager;
-    public float autoContinueDelay = 2f; // unused at the moment
+    public float autoContinueDelay = 2f;
     public GameObject restartPanel;
 
     [Header("Optional Events")]
@@ -50,364 +70,726 @@ public class WaveManager : MonoBehaviour
     private int currentLevelIndex = 0;
     private int currentWaveIndex = 0;
     private int enemiesAlive = 0;
+
     private bool finishedSpawning = false;
+    private bool waveCompletionHandled = false;
 
     private bool awaitingAreaEntry = false;
     private bool playerEnteredArea = false;
 
     private bool gameOver = false;
-
     private bool waitingForGearSelection = false;
 
-    // gets whether the game is currently waiting for the player to select a gear
-    public bool IsWaitingForGearSelection
-    {
-        get { return waitingForGearSelection; }
-    }
+    public bool IsWaitingForGearSelection =>
+        waitingForGearSelection;
 
-    // logs a message if debug logs are enabled
     private void Log(string msg)
     {
-        if (debugLogs) Debug.Log("[WaveManager] " + msg, this);
+        if (debugLogs)
+        {
+            Debug.Log(
+                "[WaveManager] " + msg,
+                this
+            );
+        }
     }
 
-    // logs a warning if debug logs are enabled
     private void Warn(string msg)
     {
-        Debug.LogWarning("[WaveManager] " + msg, this);
+        Debug.LogWarning(
+            "[WaveManager] " + msg,
+            this
+        );
     }
 
-    // logs an error if debug logs are enabled
     private void Err(string msg)
     {
-        Debug.LogError("[WaveManager] " + msg, this);
+        Debug.LogError(
+            "[WaveManager] " + msg,
+            this
+        );
     }
 
-    // summary of everything for logging
     private string State()
     {
-        return "level " + currentLevelIndex + ", wave " + currentWaveIndex +
-               " | alive " + enemiesAlive + ", finishedSpawning " + finishedSpawning +
+        return "level " + currentLevelIndex +
+               ", wave " + currentWaveIndex +
+               " | alive " + enemiesAlive +
+               ", finishedSpawning " + finishedSpawning +
                " | waitingForGear " + waitingForGearSelection +
                ", awaitingAreaEntry " + awaitingAreaEntry +
                ", playerEntered " + playerEnteredArea +
                ", gameOver " + gameOver;
     }
 
-    // initializes the wave manager
-    void Awake()
+    private void Awake()
     {
         if (Instance != null && Instance != this)
-            Warn("A second WaveManager exists in the scene. Only one should.");
+        {
+            Warn(
+                "A second WaveManager exists " +
+                "in the scene. Only one should."
+            );
+        }
 
         Instance = this;
     }
 
-    private GearPullManager.GameArea AreaForLevel(int levelIndex)
+    private GearPullManager.GameArea AreaForLevel(
+        int levelIndex)
     {
         switch (levelIndex)
         {
-            case 0:  return GearPullManager.GameArea.CastleExterior;
-            case 1:  return GearPullManager.GameArea.CastleInterior;
-            default: return GearPullManager.GameArea.ThroneRoom;
+            case 0:
+                return GearPullManager.GameArea.CastleExterior;
+
+            case 1:
+                return GearPullManager.GameArea.CastleInterior;
+
+            default:
+                return GearPullManager.GameArea.ThroneRoom;
         }
     }
 
-    // starts the wave manager
-    void Start()
+    private void ResolvePlayerGearLoadout()
     {
-        if (restartPanel != null) restartPanel.SetActive(false);
+        if (player == null)
+            return;
 
-        // find the player object
+        GearLoadout actual =
+            player.GetComponent<GearLoadout>();
+
+        if (actual == null)
+        {
+            actual =
+                player.GetComponentInChildren<GearLoadout>(
+                    true
+                );
+        }
+
+        if (actual == null)
+        {
+            actual =
+                player.GetComponentInParent<GearLoadout>();
+        }
+
+        if (actual == null)
+        {
+            Warn(
+                "No GearLoadout is attached to the " +
+                "Player hierarchy. Timed buffs and " +
+                "selected rewards cannot modify player stats."
+            );
+
+            playerGearLoadout = null;
+            return;
+        }
+
+        if (playerGearLoadout != null &&
+            playerGearLoadout != actual)
+        {
+            Warn(
+                "Player Gear Loadout pointed at a " +
+                "different object; using the actual " +
+                "Player's GearLoadout."
+            );
+        }
+
+        playerGearLoadout = actual;
+
+        if (gearPullManager != null)
+        {
+            gearPullManager.SetPlayerLoadout(
+                playerGearLoadout
+            );
+        }
+    }
+
+    private void Start()
+    {
+        if (restartPanel != null)
+        {
+            restartPanel.SetActive(false);
+        }
+
         if (player == null)
         {
-            GameObject playerObject = GameObject.FindWithTag("Player");
+            GameObject playerObject =
+                GameObject.FindWithTag("Player");
+
             if (playerObject != null)
             {
                 player = playerObject.transform;
-                Log("Player found by tag: '" + player.name + "'");
+
+                Log(
+                    "Player found by tag: '" +
+                    player.name + "'"
+                );
             }
             else
             {
-                Err("No Player assigned and no object tagged 'Player' found.");
+                Err(
+                    "No Player assigned and no object " +
+                    "tagged 'Player' found."
+                );
             }
         }
 
-        // start the wave
+        ResolvePlayerGearLoadout();
+
+        if (playerGearLoadout == null)
+        {
+            Warn(
+                "No player GearLoadout found. " +
+                "Timed and wave-count buffs " +
+                "will NOT activate. " +
+                "Assign Player Gear Loadout."
+            );
+        }
+
         StartWave();
     }
 
-    // starts the current wave
+    private bool HasValidCurrentWave()
+    {
+        if (gameLevels == null ||
+            gameLevels.Length == 0 ||
+            currentLevelIndex < 0 ||
+            currentLevelIndex >= gameLevels.Length)
+        {
+            Err(
+                "Game Levels is empty or current " +
+                "level index is invalid."
+            );
+
+            return false;
+        }
+
+        Level level =
+            gameLevels[currentLevelIndex];
+
+        if (level == null ||
+            level.waves == null ||
+            level.waves.Length == 0 ||
+            currentWaveIndex < 0 ||
+            currentWaveIndex >= level.waves.Length)
+        {
+            Err(
+                "Current level has no valid " +
+                "Waves configuration."
+            );
+
+            return false;
+        }
+
+        if (level.spawnPoints == null ||
+            level.spawnPoints.Length == 0)
+        {
+            Err(
+                "Current level has no Spawn Points."
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
     public void StartWave()
     {
         if (gameOver)
         {
-            Log("StartWave ignored: game is over");
+            Log(
+                "StartWave ignored: game is over"
+            );
+
             return;
         }
 
-        // show current status in logs
-        Level currentLevel = gameLevels[currentLevelIndex];
+        if (!HasValidCurrentWave())
+            return;
+
+        Level currentLevel =
+            gameLevels[currentLevelIndex];
+
+        Wave wave =
+            currentLevel.waves[currentWaveIndex];
+
+        if (wave.enemyPrefab == null)
+        {
+            Err(
+                "Current wave's Enemy Prefab " +
+                "is not assigned."
+            );
+
+            return;
+        }
 
         if (gearPullManager != null)
         {
-            gearPullManager.SetArea(AreaForLevel(currentLevelIndex));
+            gearPullManager.SetArea(
+                AreaForLevel(currentLevelIndex)
+            );
         }
 
-        Log("StartWave -> '" + currentLevel.levelName + "' wave " + (currentWaveIndex + 1) + "/" + currentLevel.waves.Length +
-            " (" + currentLevel.waves[currentWaveIndex].numberOfEnemies + " enemies)");
+        ResolvePlayerGearLoadout();
 
-        ShowStatus(currentLevel.levelName + " - Wave " + (currentWaveIndex + 1) + "/" + currentLevel.waves.Length);
+        if (playerGearLoadout != null)
+        {
+            playerGearLoadout.OnWaveStarted();
 
-        // start the spawning coroutine
+            Log(
+                "Notified GearLoadout.OnWaveStarted() " +
+                "on '" + playerGearLoadout.name +
+                "'; current HP " +
+                playerGearLoadout.CurrentHP +
+                "/" + playerGearLoadout.MaxHP +
+                ", ATK " + playerGearLoadout.Attack +
+                ", DEF " + playerGearLoadout.Defense
+            );
+        }
+
+        finishedSpawning = false;
+        waveCompletionHandled = false;
+        enemiesAlive = 0;
+
+        Log(
+            "StartWave -> '" +
+            currentLevel.levelName +
+            "' wave " +
+            (currentWaveIndex + 1) +
+            "/" + currentLevel.waves.Length +
+            " | enemies " + wave.numberOfEnemies +
+            " | HP " + wave.enemyMaxHealth +
+            " | damage " + wave.enemyAttackDamage
+        );
+
+        ShowStatus(
+            currentLevel.levelName +
+            " - Wave " +
+            (currentWaveIndex + 1) +
+            "/" + currentLevel.waves.Length
+        );
+
         StartCoroutine(SpawnWaveRoutine());
     }
 
-    // spawns the enemies for the current wave
-    IEnumerator SpawnWaveRoutine()
+    private IEnumerator SpawnWaveRoutine()
     {
-        // initialize the spawning flag
-        finishedSpawning = false;
+        Level currentLevel =
+            gameLevels[currentLevelIndex];
 
-        // get current level and wave
-        Level currentLevel = gameLevels[currentLevelIndex];
-        Wave currentWave = currentLevel.waves[currentWaveIndex];
+        Wave currentWave =
+            currentLevel.waves[currentWaveIndex];
 
-        // spawn enemies for the current wave
-        for (int i = 0; i < currentWave.numberOfEnemies; i++)
+        for (int i = 0;
+             i < currentWave.numberOfEnemies;
+             i++)
         {
-            Transform randomSpot = currentLevel.spawnPoints[Random.Range(0, currentLevel.spawnPoints.Length)];
+            Transform randomSpot =
+                currentLevel.spawnPoints[
+                    Random.Range(
+                        0,
+                        currentLevel.spawnPoints.Length
+                    )
+                ];
 
-            GameObject enemy = Instantiate(currentWave.enemyPrefab, randomSpot.position, randomSpot.rotation);
+            if (randomSpot == null)
+            {
+                Warn(
+                    "One Spawn Point is null; " +
+                    "skipping this enemy."
+                );
+
+                continue;
+            }
+
+            GameObject enemy = Instantiate(
+                currentWave.enemyPrefab,
+                randomSpot.position,
+                randomSpot.rotation
+            );
+
             enemiesAlive++;
 
-            Log("Spawned enemy " + (i + 1) + "/" + currentWave.numberOfEnemies + " '" + enemy.name +
-                "' at '" + randomSpot.name + "' | alive now " + enemiesAlive);
+            EnemyManager enemyManager =
+                enemy.GetComponentInChildren<EnemyManager>(
+                    true
+                );
 
-            if (enemy.GetComponent<EnemyManager>() == null)
-                Warn("Spawned prefab '" + enemy.name + "' has no EnemyManager, so it will never report its death and the wave can't finish.");
+            if (enemyManager != null)
+            {
+                enemyManager.SetWaveStats(
+                    currentWave.enemyMaxHealth,
+                    currentWave.enemyAttackDamage
+                );
+            }
+            else
+            {
+                Warn(
+                    "Spawned '" + enemy.name +
+                    "' has no EnemyManager. " +
+                    "HP/damage cannot be set, and " +
+                    "the wave may never receive a death callback."
+                );
+            }
 
-            yield return new WaitForSeconds(currentWave.spawnDelay);
+            Log(
+                "Spawned enemy " +
+                (i + 1) +
+                "/" + currentWave.numberOfEnemies +
+                " '" + enemy.name +
+                "' at '" + randomSpot.name +
+                "' | alive now " + enemiesAlive
+            );
+
+            yield return new WaitForSeconds(
+                currentWave.spawnDelay
+            );
         }
 
-        // mark spawning as finished
         finishedSpawning = true;
-        Log("Finished spawning. Alive: " + enemiesAlive);
 
-        // check if all enemies are dead
+        Log(
+            "Finished spawning. Alive: " +
+            enemiesAlive
+        );
+
         if (enemiesAlive <= 0)
         {
-            Log("All enemies were already dead when spawning finished");
             WaveCompleted();
         }
     }
 
-    // called when an enemy is defeated
     public void EnemyDefeated()
     {
-        // decrement the count of alive enemies
+        if (gameOver || waveCompletionHandled)
+            return;
+
         enemiesAlive--;
-        Log("Enemy defeated. Alive now " + enemiesAlive + " (finishedSpawning " + finishedSpawning + ")");
 
-        // check for negative enemy count
+        Log(
+            "Enemy defeated. Alive now " +
+            enemiesAlive +
+            " (finishedSpawning " +
+            finishedSpawning + ")"
+        );
+
         if (enemiesAlive < 0)
-            Warn("enemiesAlive went negative. Something reported a death twice, or an enemy was in the scene before the wave spawned it.");
+        {
+            Warn(
+                "enemiesAlive went negative; " +
+                "check for duplicate enemy death callbacks."
+            );
+        }
 
-        // check if all enemies are dead and spawning is finished
         if (enemiesAlive <= 0 && finishedSpawning)
         {
             WaveCompleted();
         }
     }
 
-    // called when a wave is completed
     private void WaveCompleted()
     {
-        // check if the game is over or waiting for gear selection
-        if (gameOver || waitingForGearSelection)
+        if (gameOver ||
+            waitingForGearSelection ||
+            waveCompletionHandled)
         {
-            Log("WaveCompleted ignored (gameOver " + gameOver + ", waitingForGear " + waitingForGearSelection + ")");
+            Log(
+                "WaveCompleted ignored. " +
+                State()
+            );
+
             return;
         }
 
-        // determine if this is the last wave of the level and the last level
-        bool lastWaveOfLevel =
-            currentWaveIndex >= gameLevels[currentLevelIndex].waves.Length - 1;
+        waveCompletionHandled = true;
 
-        // determine if this is the last level
+        if (playerGearLoadout != null)
+        {
+            playerGearLoadout.OnWaveEnded();
+
+            Log(
+                "Notified GearLoadout.OnWaveEnded() " +
+                "on '" +
+                playerGearLoadout.name + "'."
+            );
+        }
+
+        bool lastWaveOfLevel =
+            currentWaveIndex >=
+            gameLevels[currentLevelIndex].waves.Length - 1;
+
         bool lastLevel =
             currentLevelIndex >= gameLevels.Length - 1;
 
-        // log the completion status
-        Log("WaveCompleted. lastWaveOfLevel " + lastWaveOfLevel + ", lastLevel " + lastLevel);
+        Log(
+            "WaveCompleted. lastWaveOfLevel " +
+            lastWaveOfLevel +
+            ", lastLevel " + lastLevel
+        );
 
-        // check if this is the final wave of the final level
         if (lastWaveOfLevel && lastLevel)
         {
-            Log("Final wave of the final level cleared -> WinGame");
+            Log(
+                "Final wave of the final level " +
+                "cleared -> WinGame"
+            );
+
             WinGame();
+
             return;
         }
 
-        // invoke the wave complete event and show status
-        OnWaveComplete.Invoke();
+        OnWaveComplete?.Invoke();
+
         ShowStatus("Wave cleared!");
 
-        // move to the next wave
         currentWaveIndex++;
 
-        // check if this is the last wave of the level
         if (lastWaveOfLevel)
         {
-            Log("Level " + currentLevelIndex + " cleared. Opening " +
-                (gameLevels[currentLevelIndex].exitDoors != null ? gameLevels[currentLevelIndex].exitDoors.Length : 0) + " exit door(s)");
+            Log(
+                "Level " + currentLevelIndex +
+                " cleared. Opening " +
+                (gameLevels[currentLevelIndex].exitDoors != null
+                    ? gameLevels[currentLevelIndex].exitDoors.Length
+                    : 0) +
+                " exit door(s)"
+            );
 
-            OnLevelComplete.Invoke();
+            OnLevelComplete?.Invoke();
 
-            // open all exit doors
-            foreach (Door door in gameLevels[currentLevelIndex].exitDoors)
+            Door[] doors =
+                gameLevels[currentLevelIndex].exitDoors;
+
+            if (doors != null)
             {
-                if (door != null)
+                foreach (Door door in doors)
                 {
-                    Log("Opening door '" + door.name + "'");
-                    door.Open();
-                }
-                else
-                {
-                    Warn("Skipped an empty Exit Door slot on level " + currentLevelIndex);
+                    if (door != null)
+                    {
+                        Log(
+                            "Opening door '" +
+                            door.name + "'"
+                        );
+
+                        door.Open();
+                    }
+                    else
+                    {
+                        Warn(
+                            "Skipped an empty Exit Door slot on level " +
+                            currentLevelIndex
+                        );
+                    }
                 }
             }
 
-            // move to the next level
+            // Advance to the next area.
             currentLevelIndex++;
             currentWaveIndex = 0;
 
-            // set the flag to wait for the player to enter the next area
             awaitingAreaEntry = true;
             playerEnteredArea = false;
-            Log("Now waiting for the player to enter level " + currentLevelIndex + " (an AreaTrigger with Level Index " + currentLevelIndex + " must fire)");
-            ShowStatus("Area cleared! Head through the door.");
+
+            Log(
+                "Now waiting for the player to enter level " +
+                currentLevelIndex +
+                " (an AreaTrigger with Level Index " +
+                currentLevelIndex + " must fire)"
+            );
+
+            ShowStatus(
+                "Area cleared! Head through the door."
+            );
         }
 
-        // set the flag to wait for gear selection
         waitingForGearSelection = true;
-        Log("Waiting for gear selection. " + State());
 
-        // show the gear selection screen
+        Log(
+            "Waiting for gear selection. " +
+            State()
+        );
+
         if (gearPullManager != null)
         {
-            gearPullManager.ShowOpenButton();
+            gearPullManager.OpenPull();
         }
         else
         {
-            Warn("No GearPullManager, so nothing will call ContinueToNextWave() and the game will stall here.");
+            Warn(
+                "No GearPullManager; nothing may call " +
+                "ContinueToNextWave()."
+            );
         }
     }
 
-    // continues to the next wave after gear selection
     public void ContinueToNextWave()
     {
-        // check if the game is over or not waiting for gear selection
-        if (gameOver || !waitingForGearSelection)
+        if (gameOver ||
+            !waitingForGearSelection)
         {
-            Log("ContinueToNextWave ignored (gameOver " + gameOver + ", waitingForGear " + waitingForGearSelection + ")");
+            Log(
+                "ContinueToNextWave ignored. " +
+                State()
+            );
+
             return;
         }
 
-        // after picking gear, screen is closed
         waitingForGearSelection = false;
-        Log("Gear screen closed. " + State());
 
-        // hide the gear selection screen
+        Log(
+            "Gear screen closed. " +
+            State()
+        );
+
         if (gearPullManager != null)
+        {
             gearPullManager.HideOpenButton();
+        }
 
-        // check if we're waiting for an area entry
         if (awaitingAreaEntry)
         {
-            Log("Still need the player to walk into the next room");
+            Log(
+                "Still need the player to walk " +
+                "into the next room"
+            );
+
             TryBeginNextArea();
+
             return;
         }
 
-        // start next wave
         StartWave();
     }
 
-    // checks if the game is waiting for the player to enter a specific area
     public bool IsAwaitingArea(int levelIndex)
     {
-        return awaitingAreaEntry && levelIndex == currentLevelIndex;
+        return awaitingAreaEntry &&
+               levelIndex == currentLevelIndex;
     }
 
-    // called when the player enters a new area
     public void PlayerEnteredArea(int levelIndex)
     {
-        Log("PlayerEnteredArea(" + levelIndex + "). " + State());
+        Log(
+            "PlayerEnteredArea(" +
+            levelIndex + "). " +
+            State()
+        );
 
-        // check if we're waiting for an area entry
         if (!awaitingAreaEntry)
         {
-            Log("Ignored: not waiting for an area entry right now (the level isn't cleared yet, or this was already handled)");
+            Log(
+                "Ignored: not waiting for an " +
+                "area entry right now"
+            );
+
             return;
         }
 
-        // check if the trigger is for the correct level    
         if (levelIndex != currentLevelIndex)
         {
-            Log("Ignored: trigger is for level " + levelIndex + " but the next level is " + currentLevelIndex + ". Check the trigger's Level Index.");
+            Log(
+                "Ignored: trigger level " +
+                levelIndex +
+                " but the next level is " +
+                currentLevelIndex
+            );
+
             return;
         }
 
         playerEnteredArea = true;
+
         TryBeginNextArea();
     }
 
-    // attempts to begin the next area
     private void TryBeginNextArea()
     {
-        if (gameOver || !awaitingAreaEntry || !playerEnteredArea || waitingForGearSelection)
+        if (gameOver ||
+            !awaitingAreaEntry ||
+            !playerEnteredArea ||
+            waitingForGearSelection)
         {
-            Log("TryBeginNextArea not ready. " + State());
+            Log(
+                "TryBeginNextArea not ready. " +
+                State()
+            );
+
             return;
         }
 
-        // begin the next area
         awaitingAreaEntry = false;
-        Log("Player is in the new area and the gear screen is closed. Starting in " + areaStartDelay + "s");
-        StartCoroutine(StartWaveAfterDelay());
+
+        Log(
+            "Player is in the new area and " +
+            "gear screen closed. Starting in " +
+            areaStartDelay + "s"
+        );
+
+        StartCoroutine(
+            StartWaveAfterDelay()
+        );
     }
 
-    // starts the wave after a delay
-    IEnumerator StartWaveAfterDelay()
+    private IEnumerator StartWaveAfterDelay()
     {
         ShowStatus("Get ready...");
-        yield return new WaitForSeconds(areaStartDelay);
+
+        yield return new WaitForSeconds(
+            areaStartDelay
+        );
+
         StartWave();
     }
 
-    // wins the game and become new king
     private void WinGame()
     {
         gameOver = true;
+
         Log("GAME WON");
+
         ShowStatus("You are the new king!");
-        OnGameWon.Invoke();
-        if (restartPanel != null) restartPanel.SetActive(true);
+
+        OnGameWon?.Invoke();
+
+        if (restartPanel != null)
+        {
+            restartPanel.SetActive(true);
+        }
     }
 
-    // loses the game and called from PlayerHealth when the player dies
     public void PlayerDied()
     {
+        if (gameOver)
+            return;
+
         gameOver = true;
+
+        if (playerGearLoadout != null)
+        {
+            playerGearLoadout.OnWaveEnded();
+        }
+
         Log("GAME LOST");
-        Log("PlayerDied. Stopping all coroutines. " + State());
+
+        Log(
+            "PlayerDied. Stopping all coroutines. " +
+            State()
+        );
+
         StopAllCoroutines();
+
         ShowStatus("You died...");
-        if (restartPanel != null) restartPanel.SetActive(true);
+
+        if (restartPanel != null)
+        {
+            restartPanel.SetActive(true);
+        }
     }
 
-    // shows a status message
     private void ShowStatus(string message)
     {
         if (statusText != null)
@@ -418,7 +800,10 @@ public class WaveManager : MonoBehaviour
 
     public void RestartGame()
     {
-        Time.timeScale = 1f; // in case the game was paused
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        Time.timeScale = 1f;
+
+        SceneManager.LoadScene(
+            SceneManager.GetActiveScene().name
+        );
     }
 }

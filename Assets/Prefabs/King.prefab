@@ -812,6 +812,7 @@ GameObject:
   - component: {fileID: 4710838554712559641}
   - component: {fileID: 7770473410983947588}
   - component: {fileID: 425135894831342053}
+  - component: {fileID: 5839811720393527062}
   m_Layer: 0
   m_Name: King
   m_TagString: Enemy
@@ -964,6 +965,24 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &5839811720393527062
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4930880802551878915}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cb60eb6872c53241baef3feaa6f38a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyWaveStatOverrides
+  _healthComponent: {fileID: -630078589890044040, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+  _maxHealthMember: maxHealth
+  _currentHealthMember: health
+  _attackComponent: {fileID: -630078589890044040, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+  _damageMember: damage
+  _showLogs: 1
 --- !u!1 &5184431148976417246
 GameObject:
   m_ObjectHideFlags: 0

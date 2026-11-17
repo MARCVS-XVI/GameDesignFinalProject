@@ -24,4 +24,7 @@ MonoBehaviour:
   bonusDefense: 0
   specialEffect: 0
   effectValue: 0
+  durationType: 0
+  durationSeconds: 15
+  durationWaves: 2
   restoreHP: 5

@@ -880,10 +880,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df090e1f5e15d134b8087008e2b6fb95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AreaTrigger
-  levelIndex: 2
-  doorsToClose:
-  - {fileID: 1712053537}
-  debugLogs: 1
+  _gearPullManager: {fileID: 1466012959}
+  _area: 2
+  _waveManager: {fileID: 1466012957}
+  _debugLogs: 0
 --- !u!65 &111568885
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1149,10 +1149,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df090e1f5e15d134b8087008e2b6fb95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AreaTrigger
-  levelIndex: 1
-  doorsToClose:
-  - {fileID: 1680776069}
-  debugLogs: 1
+  _gearPullManager: {fileID: 1466012959}
+  _area: 1
+  _waveManager: {fileID: 1466012957}
+  _debugLogs: 0
 --- !u!65 &178109082
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6879,6 +6879,8 @@ MonoBehaviour:
   _baseMaxHP: 10
   _baseAttack: 5
   _baseDefense: 5
+  _playerHealth: {fileID: 1291888515}
+  _weaponDamageSources: []
 --- !u!4 &1291888513 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6882302768053792650, guid: 35da5635da665e54a84fedc856d6771d, type: 3}
@@ -6925,10 +6927,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHealth: 10
   invulnerableTime: 0.5
+  defenseReductionPerPoint: 0.05
+  maxDefenseReduction: 0.8
   showWorldBar: 1
   barOffset: {x: 0, y: 2.2, z: 0}
   barSize: {x: 1.6, y: 0.2}
-  debugLogs: 1
+  debugLogs: 0
   OnDamaged:
     m_PersistentCalls:
       m_Calls: []
@@ -8200,12 +8204,18 @@ MonoBehaviour:
     - numberOfEnemies: 3
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 10
+      enemyAttackDamage: 1
     - numberOfEnemies: 5
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 12
+      enemyAttackDamage: 3
     - numberOfEnemies: 8
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 15
+      enemyAttackDamage: 5
   - levelName: Inside
     playerStartPoint: {fileID: 0}
     exitDoors:
@@ -8217,15 +8227,23 @@ MonoBehaviour:
     - numberOfEnemies: 5
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 15
+      enemyAttackDamage: 5
     - numberOfEnemies: 5
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 20
+      enemyAttackDamage: 7
     - numberOfEnemies: 8
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 20
+      enemyAttackDamage: 10
     - numberOfEnemies: 10
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 25
+      enemyAttackDamage: 10
   - levelName: Throne Room
     playerStartPoint: {fileID: 0}
     exitDoors: []
@@ -8235,19 +8253,30 @@ MonoBehaviour:
     - numberOfEnemies: 5
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 25
+      enemyAttackDamage: 10
     - numberOfEnemies: 5
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 30
+      enemyAttackDamage: 15
     - numberOfEnemies: 5
       spawnDelay: 1
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 35
+      enemyAttackDamage: 20
     - numberOfEnemies: 5
       spawnDelay: 0.5
       enemyPrefab: {fileID: 3316355382207161437, guid: 0d8bff179f52dcc42858744b420e11aa, type: 3}
+      enemyMaxHealth: 50
+      enemyAttackDamage: 30
     - numberOfEnemies: 1
       spawnDelay: 1
       enemyPrefab: {fileID: 4930880802551878915, guid: 2ffff3bfaabfe574f94ebc9b83d681d7, type: 3}
+      enemyMaxHealth: 250
+      enemyAttackDamage: 35
   player: {fileID: 1291888513}
+  playerGearLoadout: {fileID: 1291888508}
   statusText: {fileID: 1901302178}
   gearPullManager: {fileID: 1466012959}
   autoContinueDelay: 2
@@ -8262,7 +8291,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   areaStartDelay: 5
-  debugLogs: 1
+  debugLogs: 0
 --- !u!4 &1466012958
 Transform:
   m_ObjectHideFlags: 0
@@ -8305,9 +8334,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: a4071dc191728194d81a3e575528e695, type: 2}
   _demoLoadout: {fileID: 0}
   _offerGearAndEffect: 1
-  _castleExteriorScene: CastleExterior
-  _castleInteriorScene: CastleInterior
-  _throneRoomScene: ThroneRoom
+  _startingArea: 0
   _exteriorRates:
     common: 55
     rare: 30
