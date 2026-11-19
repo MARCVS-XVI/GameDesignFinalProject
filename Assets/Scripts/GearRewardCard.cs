@@ -25,16 +25,13 @@ public class GearRewardCard : MonoBehaviour
     private void Awake()
     {
         _button = GetComponent<Button>();
-
         _button.onClick.AddListener(OnClicked);
     }
 
     private void OnDestroy()
     {
         if (_button != null)
-        {
             _button.onClick.RemoveListener(OnClicked);
-        }
     }
 
     public void Display(
@@ -45,53 +42,64 @@ public class GearRewardCard : MonoBehaviour
         _manager = manager;
 
         if (_nameText != null)
-        {
             _nameText.text = reward.rewardName;
-        }
 
         if (_kindText != null)
-        {
-            if (reward.kind == RewardKind.Equipment)
-            {
-                _kindText.text = reward.slot.ToString();
-            }
-            else
-            {
-                _kindText.text = "Effect";
-            }
-        }
+            _kindText.text = reward.kind == RewardKind.Equipment
+                ? reward.slot.ToString() : "Effect";
 
         if (_rarityText != null)
-        {
             _rarityText.text = reward.rarity.ToString();
-        }
 
         if (_descriptionText != null)
         {
-            string details = reward.description;
+            string details = reward.description ?? "";
 
             if (reward.bonusHP != 0)
-            {
-                details +=
-                    $"\nHP {reward.bonusHP:+#;-#;0}";
-            }
+                details += $"\nHP {reward.bonusHP:+#;-#;0}";
 
             if (reward.bonusAttack != 0)
-            {
-                details +=
-                    $"\nATK {reward.bonusAttack:+#;-#;0}";
-            }
+                details += $"\nATK {reward.bonusAttack:+#;-#;0}";
 
             if (reward.bonusDefense != 0)
+                details += $"\nDEF {reward.bonusDefense:+#;-#;0}";
+
+            if (reward.specialEffect != GearSpecialEffect.None)
             {
                 details +=
-                    $"\nDEF {reward.bonusDefense:+#;-#;0}";
+                    $"\n{FormatEffectName(reward.specialEffect)}: {reward.effectValue:0.#}%";
             }
 
             if (reward.restoreHP > 0)
+                details += $"\nRestore {reward.restoreHP} HP now";
+
+            if (reward.kind == RewardKind.Effect)
             {
-                details +=
-                    $"\nRestore {reward.restoreHP} HP";
+                bool hasOngoingBonus =
+                    reward.bonusHP != 0 ||
+                    reward.bonusAttack != 0 ||
+                    reward.bonusDefense != 0 ||
+                    reward.specialEffect != GearSpecialEffect.None;
+
+                if (hasOngoingBonus)
+                {
+                    switch (reward.durationType)
+                    {
+                        case GearEffectDuration.Permanent:
+                            details += "\nDuration: Permanent";
+                            break;
+
+                        case GearEffectDuration.SecondsFromWaveStart:
+                            details +=
+                                $"\nDuration: {reward.durationSeconds:0.#}s next wave";
+                            break;
+
+                        case GearEffectDuration.NumberOfWaves:
+                            details +=
+                                $"\nDuration: {reward.durationWaves} wave(s), starting next wave";
+                            break;
+                    }
+                }
             }
 
             _descriptionText.text = details;
@@ -130,12 +138,37 @@ public class GearRewardCard : MonoBehaviour
         }
     }
 
+    private static string FormatEffectName(
+        GearSpecialEffect effect)
+    {
+        switch (effect)
+        {
+            case GearSpecialEffect.AttackPercent:
+                return "ATK bonus";
+
+            case GearSpecialEffect.DefensePercent:
+                return "DEF bonus";
+
+            case GearSpecialEffect.HealthPercent:
+                return "Max HP bonus";
+
+            case GearSpecialEffect.CriticalChance:
+                return "Critical chance";
+
+            case GearSpecialEffect.BurnChance:
+                return "Burn chance";
+
+            case GearSpecialEffect.PoisonChance:
+                return "Poison chance";
+
+            default:
+                return effect.ToString();
+        }
+    }
 
     private void OnClicked()
     {
         if (_manager != null && _reward != null)
-        {
-            _manager.SelectReward(_rewardIndex);
-        }
+            _manager.SelectReward(_reward);
     }
 }

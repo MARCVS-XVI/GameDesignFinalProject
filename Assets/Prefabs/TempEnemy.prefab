@@ -165,3 +165,4 @@ MonoBehaviour:
   barOffset: {x: 0, y: 2.2, z: 0}
   barSize: {x: 1.2, y: 0.15}
   debugLogs: 1
+  health: 0

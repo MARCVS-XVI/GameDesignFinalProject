@@ -7,10 +7,22 @@ public class PlayerHealth : MonoBehaviour
     public float maxHealth = 10f;
     public float invulnerableTime = 0.5f;
 
+    [Header("Gear Defense")]
+    [Tooltip("Each DEF point reduces incoming damage by this fraction. 0.05 = 5% per point.")]
+    [Range(0f, 1f)]
+    public float defenseReductionPerPoint = 0.05f;
+
+    [Tooltip("Maximum fraction of incoming damage that defense can prevent.")]
+    [Range(0f, 0.95f)]
+    public float maxDefenseReduction = 0.8f;
+
     [Header("Health Bar")]
     public bool showWorldBar = true;
-    public Vector3 barOffset = new Vector3(0f, 2.2f, 0f);
-    public Vector2 barSize = new Vector2(1.6f, 0.2f);
+    public Vector3 barOffset =
+        new Vector3(0f, 2.2f, 0f);
+
+    public Vector2 barSize =
+        new Vector2(1.6f, 0.2f);
 
     [Header("Debug")]
     public bool debugLogs = true;
@@ -19,149 +31,270 @@ public class PlayerHealth : MonoBehaviour
     public UnityEvent OnDied;
 
     private HealthBar worldBar;
+    private GearLoadout gearLoadout;
 
     private float health;
     private float lastHitTime = -999f;
     private bool isDead = false;
 
-    public float CurrentHealth { get { return health; } }
+    public float CurrentHealth
+    {
+        get { return health; }
+    }
 
-    // logs a message if debug logs are enabled
     private void Log(string message)
     {
         if (debugLogs)
-            Debug.Log("[PlayerHealth] " + message, this);
+        {
+            Debug.Log(
+                "[PlayerHealth] " + message,
+                this
+            );
+        }
     }
 
-    // initializes the player's health
-    void Start()
+    private void Awake()
     {
-        // initialize the player's health
-        health = maxHealth;
-        Log("Start. Health set to " + health + "/" + maxHealth);
+        maxHealth = Mathf.Max(1f, maxHealth);
 
-        // create the world space health bar if enabled
+        health = maxHealth;
+
+        gearLoadout = GetComponent<GearLoadout>();
+
+        if (gearLoadout == null)
+        {
+            gearLoadout =
+                GetComponentInParent<GearLoadout>();
+        }
+
+        if (gearLoadout == null)
+        {
+            gearLoadout =
+                GetComponentInChildren<GearLoadout>(true);
+        }
+
+        Log(
+            "Awake. Health initialized to " +
+            health + "/" + maxHealth
+        );
+    }
+
+    private void Start()
+    {
+
         if (showWorldBar)
         {
-            worldBar = HealthBar.Create(transform, barOffset, barSize);
+            worldBar = HealthBar.Create(
+                transform,
+                barOffset,
+                barSize
+            );
+
             if (worldBar == null)
-                Debug.LogError("[PlayerHealth] Failed to create the floating health bar.", this);
+            {
+                Debug.LogError(
+                    "[PlayerHealth] Failed to create the floating health bar.",
+                    this
+                );
+            }
             else
-                Log("Floating bar created at offset " + barOffset + " with size " + barSize);
+            {
+                Log(
+                    "Floating bar created at offset " +
+                    barOffset +
+                    " with size " + barSize
+                );
+            }
         }
         else
         {
-            Log("Floating bar is disabled (showWorldBar is unticked)");
+            Log(
+                "Floating bar is disabled " +
+                "(showWorldBar is unticked)"
+            );
         }
 
-        // initialize the UI
         UpdateUI();
     }
 
-    // takes damage from an attack
     public void TakeDamage(float amount)
     {
-        // log the damage attempt
         if (isDead)
         {
-            Log("Ignored " + amount + " damage: player is already dead");
+            Log(
+                "Ignored " + amount +
+                " damage: player is already dead"
+            );
             return;
         }
 
-        // check if the player is invulnerable
         float timeSinceHit = Time.time - lastHitTime;
+
         if (timeSinceHit < invulnerableTime)
         {
-            Log("Ignored " + amount + " damage: invulnerable for " + (invulnerableTime - timeSinceHit).ToString("F2") + "s more");
+            Log(
+                "Ignored " + amount +
+                " damage: invulnerable for " +
+                (invulnerableTime - timeSinceHit).ToString("F2") +
+                "s more"
+            );
             return;
         }
+
+        if (amount <= 0f)
+            return;
+
         lastHitTime = Time.time;
 
-        // apply the damage
+        float appliedDamage = amount;
+
+        if (gearLoadout != null)
+        {
+            float reduction = Mathf.Clamp(
+                gearLoadout.Defense *
+                defenseReductionPerPoint,
+                0f,
+                maxDefenseReduction
+            );
+
+            appliedDamage =
+                amount * (1f - reduction);
+        }
+
         float before = health;
-        health = Mathf.Max(0f, health - amount);
-        Log("Took " + amount + " damage. Health " + before + " -> " + health);
 
-        // update the UI and invoke the damage event
+        health = Mathf.Max(
+            0f,
+            health - appliedDamage
+        );
+
+        Log(
+            "Incoming " + amount +
+            ", after DEF " + appliedDamage +
+            ". Health " + before +
+            " -> " + health
+        );
+
         UpdateUI();
-        OnDamaged.Invoke();
 
-        // check if the player has died
+        OnDamaged?.Invoke();
+
         if (health <= 0f)
         {
             Log("Health reached 0");
+
             Die();
         }
     }
 
-    // heals the player
     public void Heal(float amount)
     {
-        // log the heal attempt
         if (isDead)
         {
-            Log("Ignored heal of " + amount + ": player is dead");
+            Log(
+                "Ignored heal of " + amount +
+                ": player is dead"
+            );
             return;
         }
 
-        // apply the heal
         float before = health;
-        health = Mathf.Min(maxHealth, health + amount);
-        Log("Healed " + amount + ". Health " + before + " -> " + health);
+
+        health = Mathf.Min(
+            maxHealth,
+            health + amount
+        );
+
+        Log(
+            "Healed " + amount +
+            ". Health " + before +
+            " -> " + health
+        );
+
         UpdateUI();
     }
 
-    // sets the maximum health and optionally heals the player to full
-    public void SetMaxHealth(float newMax, bool healToFull = false)
+    public void SetMaxHealth(
+        float newMax,
+        bool healToFull = false)
     {
-        Log("Max health changed " + maxHealth + " -> " + newMax + " (healToFull: " + healToFull + ")");
+        Log(
+            "Max health changed " +
+            maxHealth + " -> " + newMax +
+            " (healToFull: " + healToFull + ")"
+        );
 
-        // update the maximum health and optionally heal the player
-        maxHealth = newMax;
-        health = healToFull ? maxHealth : Mathf.Min(health, maxHealth);
-        Log("Current health is now " + health);
+        maxHealth = Mathf.Max(1f, newMax);
+
+        health = healToFull
+            ? maxHealth
+            : Mathf.Clamp(
+                health,
+                0f,
+                maxHealth
+            );
+
+        Log(
+            "Current health is now " + health
+        );
+
         UpdateUI();
     }
 
-    // kills the player
     private void Die()
     {
-        // mark the player as dead
         isDead = true;
-        Log("Player died");
-        OnDied.Invoke();
 
-        // disable the player controller
-        PlayerController controller = GetComponent<PlayerController>();
+        Log("Player died");
+
+        OnDied?.Invoke();
+
+        PlayerController controller =
+            GetComponent<PlayerController>();
+
         if (controller != null)
         {
             controller.enabled = false;
+
             Log("PlayerController disabled");
         }
         else
         {
-            Debug.LogWarning("[PlayerHealth] No PlayerController found to disable on death.", this);
+            Debug.LogWarning(
+                "[PlayerHealth] No PlayerController found to disable on death.",
+                this
+            );
         }
 
-        // notify the wave manager
         if (WaveManager.Instance != null)
         {
             WaveManager.Instance.PlayerDied();
-            Log("Notified WaveManager.PlayerDied()");
+
+            Log(
+                "Notified WaveManager.PlayerDied()"
+            );
         }
         else
         {
-            Debug.LogWarning("[PlayerHealth] WaveManager.Instance is null, so it was not told the player died.", this);
+            Debug.LogWarning(
+                "[PlayerHealth] WaveManager.Instance is null, so it was not told the player died.",
+                this
+            );
         }
     }
 
-    // updates the UI to reflect the current health
     private void UpdateUI()
     {
         if (worldBar != null)
-            worldBar.SetFill(health / maxHealth);
+        {
+            worldBar.SetFill(
+                health / maxHealth
+            );
+        }
 
-        // log the UI update
-        Log("UI updated (" + health + "/" + maxHealth + ")");
+        Log(
+            "UI updated (" +
+            health + "/" + maxHealth + ")"
+        );
     }
 }

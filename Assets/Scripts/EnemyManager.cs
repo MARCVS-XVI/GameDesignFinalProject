@@ -2,180 +2,319 @@ using UnityEngine;
 
 public class EnemyManager : MonoBehaviour
 {
-    [Header("Stats")]
-    public float maxHealth = 3f;
+    [Header("Stats (Prefab Defaults)")]
+    [Min(1f)] public float maxHealth = 3f;
     public float moveSpeed = 3f;
 
-    [Header("Attacking the player")]
-    public float contactDamage = 1f;
-    public float attackCooldown = 1f;
+    [Header("Attacking the Player")]
+    [Min(0f)] public float contactDamage = 1f;
+    [Min(0f)] public float attackCooldown = 1f;
     public bool dieOnContact = false;
 
-    [Header("Taking damage from gear")]
-    public float defaultGearDamage = 1f;
-    public float hitCooldown = 0.4f;
+    [Header("Taking Damage from Gear")]
+    [Min(0f)] public float defaultGearDamage = 1f;
+    [Min(0f)] public float hitCooldown = 0.4f;
 
-    [Header("Health bar")]
+    [Header("Health Bar")]
     public Vector3 barOffset = new Vector3(0f, 2.2f, 0f);
     public Vector2 barSize = new Vector2(1.2f, 0.15f);
 
     [Header("Debug")]
     public bool debugLogs = true;
 
-    private float health;
+    [SerializeField] private float health;
+
     private Transform player;
     private HealthBar healthBar;
     private float lastHitTime = -999f;
     private float lastAttackTime = -999f;
-    private bool isDead = false;
+    private bool isDead;
 
-    // log a message if debug logs are enabled
-    private void Log(string msg)
+    public float CurrentHealth => health;
+
+    private void Log(string message)
     {
-        if (debugLogs) Debug.Log("[Enemy] " + name + ": " + msg, this);
+        if (debugLogs)
+        {
+            Debug.Log(
+                "[Enemy] " + name + ": " + message,
+                this
+            );
+        }
     }
 
-    // initialize the enemy component
-    void Start()
+    private void Awake()
     {
+        maxHealth = Mathf.Max(1f, maxHealth);
+        health = maxHealth;
+    }
+
+    public void SetWaveStats(
+        float waveMaxHealth,
+        float waveContactDamage)
+    {
+        if (isDead)
+            return;
+
+        maxHealth = Mathf.Max(1f, waveMaxHealth);
+
+        contactDamage = Mathf.Max(
+            0f,
+            waveContactDamage
+        );
+
         health = maxHealth;
 
-        // find the player object to follow
-        GameObject playerObject = GameObject.FindWithTag("Player");
+        UpdateHealthBar();
+
+        Log(
+            "Wave stats set: HP " +
+            health + "/" + maxHealth +
+            ", contact damage " + contactDamage
+        );
+    }
+
+    private void Start()
+    {
+        GameObject playerObject =
+            GameObject.FindWithTag("Player");
+
         if (playerObject != null)
         {
             player = playerObject.transform;
-            Log("Found player '" + playerObject.name + "'");
+
+            Log(
+                "Found player '" +
+                playerObject.name + "'"
+            );
         }
         else
         {
-            Debug.LogError("[Enemy] " + name + ": no object tagged 'Player' found, so it won't move.", this);
+            Debug.LogError(
+                "[Enemy] " + name +
+                ": no object tagged 'Player' found, " +
+                "so it won't move.",
+                this
+            );
         }
 
-        // enemy needs a trigger collider to detect gear and the player
         Collider col = GetComponent<Collider>();
+
         if (col == null)
-            Debug.LogError("[Enemy] " + name + ": no Collider. It can't detect hits.", this);
+        {
+            Debug.LogError(
+                "[Enemy] " + name +
+                ": no Collider. It can't detect hits.",
+                this
+            );
+        }
         else if (!col.isTrigger)
-            Debug.LogWarning("[Enemy] " + name + ": collider is not a trigger, so OnTrigger events won't fire.", this);
+        {
+            Debug.LogWarning(
+                "[Enemy] " + name +
+                ": collider is not a trigger, " +
+                "so OnTrigger events won't fire.",
+                this
+            );
+        }
 
-        // initialize the health bar
-        if (maxHealth <= 0f)
-            Debug.LogError("[Enemy] " + name + ": maxHealth is " + maxHealth + ". The health bar will break.", this);
+        healthBar = HealthBar.Create(
+            transform,
+            barOffset,
+            barSize
+        );
 
-        // create the health bar
-        healthBar = HealthBar.Create(transform, barOffset, barSize);
         if (healthBar == null)
-            Debug.LogError("[Enemy] " + name + ": health bar was not created.", this);
+        {
+            Debug.LogError(
+                "[Enemy] " + name +
+                ": health bar was not created.",
+                this
+            );
+        }
 
-        Log("Spawned. Health " + health + "/" + maxHealth);
+        UpdateHealthBar();
+
+        Log(
+            "Spawned. Health " +
+            health + "/" + maxHealth +
+            ", contact damage " + contactDamage
+        );
     }
 
-    // update the enemy's position each frame
-    void Update()
+    private void Update()
     {
-        if (player == null || isDead) return;
+        if (player == null || isDead)
+            return;
 
-        // move towards the player
-        Vector3 target = new Vector3(player.position.x, transform.position.y, player.position.z);
-        transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
+        Vector3 target = new Vector3(
+            player.position.x,
+            transform.position.y,
+            player.position.z
+        );
+
+        transform.position = Vector3.MoveTowards(
+            transform.position,
+            target,
+            moveSpeed * Time.deltaTime
+        );
     }
 
-    // handle collisions with other objects
-    void OnTriggerEnter(Collider other) { HandleContact(other); }
-    void OnTriggerStay(Collider other)  { HandleContact(other); }
+    private void OnTriggerEnter(Collider other)
+    {
+        HandleContact(other);
+    }
 
-    // handle contact with other objects
+    private void OnTriggerStay(Collider other)
+    {
+        HandleContact(other);
+    }
+
     private void HandleContact(Collider other)
     {
-        if (isDead) return;
+        if (isDead)
+            return;
 
-        // check if the contact is with a gear
         if (other.CompareTag("Gear"))
         {
-            // check if the gear has hit cooldown
-            float since = Time.time - lastHitTime;
+            if (Time.time - lastHitTime < hitCooldown)
+                return;
 
-            // if the gear is on cooldown, ignore the hit
-            if (since < hitCooldown) return;
             lastHitTime = Time.time;
 
-            // get the gear's damage
-            GearDamage gear = other.GetComponentInParent<GearDamage>();
-            if (gear == null)
-                Log("Gear hit by '" + other.name + "' but no GearDamage found, using default " + defaultGearDamage);
-            else
-                Log("Gear hit by '" + other.name + "' for " + gear.damage);
+            GearDamage gear =
+                other.GetComponentInParent<GearDamage>();
 
-            // deal damage to the enemy
-            TakeDamage(gear != null ? gear.damage : defaultGearDamage);
+            float damage = gear != null
+                ? gear.damage
+                : defaultGearDamage;
+
+            if (gear == null)
+            {
+                Log(
+                    "Gear hit from '" +
+                    other.name +
+                    "' without GearDamage; " +
+                    "using fallback " + defaultGearDamage
+                );
+            }
+            else
+            {
+                Log(
+                    "Gear hit from '" +
+                    other.name +
+                    "' for " + damage
+                );
+            }
+
+            TakeDamage(damage);
+
             return;
         }
 
-        // check if the contact is with the player
         if (other.CompareTag("Player"))
         {
-            // this is for testing purpose (can toggle on/off)
             if (dieOnContact)
             {
-                Log("Touched player, dieOnContact is on");
+                Log(
+                    "Touched player, dieOnContact enabled"
+                );
+
                 Die();
                 return;
             }
 
-            // check if the player is on cooldown
-            if (Time.time - lastAttackTime < attackCooldown) return;
-
-            // update the last attack time
-            lastAttackTime = Time.time;
-
-            // get the player's health
-            PlayerHealth playerHealth = other.GetComponentInParent<PlayerHealth>();
-            if (playerHealth == null)
+            if (Time.time - lastAttackTime <
+                attackCooldown)
             {
-                Debug.LogWarning("[Enemy] " + name + ": touched '" + other.name + "' but no PlayerHealth found on it or its parents.", this);
                 return;
             }
 
-            // deal damage to the player
-            Log("Player contact, dealing " + contactDamage);
+            PlayerHealth playerHealth =
+                other.GetComponentInParent<PlayerHealth>();
+
+            if (playerHealth == null)
+            {
+                Debug.LogWarning(
+                    "[Enemy] " + name +
+                    ": touched '" +
+                    other.name +
+                    "' but no PlayerHealth was found.",
+                    this
+                );
+
+                return;
+            }
+
+            lastAttackTime = Time.time;
+
+            Log(
+                "Player contact, dealing " +
+                contactDamage
+            );
+
             playerHealth.TakeDamage(contactDamage);
         }
     }
 
-    // take damage from an attack
+
     public void TakeDamage(float amount)
     {
-        // ignore damage if the enemy is already dead
-        if (isDead) return;
+        if (isDead || amount <= 0f)
+            return;
 
-        // update the enemy's health
         float before = health;
-        health -= amount;
-        Log("Took " + amount + " damage. Health " + before + " -> " + health);
 
-        // update the health bar
-        if (healthBar != null)
-            healthBar.SetFill(health / maxHealth);
+        health = Mathf.Max(
+            0f,
+            health - amount
+        );
 
-        // check if the enemy is dead
+        Log(
+            "Took " + amount +
+            " damage. Health " +
+            before + " -> " + health
+        );
+
+        UpdateHealthBar();
+
         if (health <= 0f)
+        {
             Die();
+        }
     }
 
-    // kill the enemy
+    private void UpdateHealthBar()
+    {
+        if (healthBar != null)
+        {
+            healthBar.SetFill(
+                health / Mathf.Max(1f, maxHealth)
+            );
+        }
+    }
     private void Die()
     {
-        // ignore if the enemy is already dead
-        if (isDead) return;
+        if (isDead)
+            return;
+
         isDead = true;
+
         Log("Died");
 
-        // notify the wave manager and destroy enemy prefab
         if (WaveManager.Instance != null)
+        {
             WaveManager.Instance.EnemyDefeated();
+        }
         else
-            Debug.LogWarning("[Enemy] " + name + ": WaveManager.Instance is null, so the wave won't count this kill.", this);
+        {
+            Debug.LogWarning(
+                "[Enemy] " + name +
+                ": WaveManager.Instance is null, " +
+                "so this kill won't count.",
+                this
+            );
+        }
 
         Destroy(gameObject);
     }

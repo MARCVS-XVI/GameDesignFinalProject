@@ -4,47 +4,66 @@ using UnityEngine;
 
 public class GearLoadout : MonoBehaviour
 {
-
     [Header("Starting Stats")]
-
     [SerializeField] private int _baseMaxHP = 10;
-
     [SerializeField] private int _baseAttack = 5;
-
     [SerializeField] private int _baseDefense = 5;
+
+    [Header("Player Integration")]
+    [Tooltip("PlayerHealth on the real player.")]
+    [SerializeField] private PlayerHealth _playerHealth;
+
+    [Tooltip("Weapon hitboxes. If empty, searches children.")]
+    [SerializeField] private GearDamage[] _weaponDamageSources;
 
     private GearReward _sword;
     private GearReward _shield;
     private GearReward _armor;
 
-    private readonly List<GearReward> _permanentEffects =
-        new List<GearReward>();
+    private class EffectInstance
+    {
+        public GearReward reward;
 
-    public int CurrentHP { get; private set; }
+        public bool active;
+        public bool waitingForWave;
+
+        public float remainingSeconds;
+        public int remainingWaves;
+    }
+
+    private readonly List<EffectInstance> _effects =
+        new List<EffectInstance>();
+
+    private bool _waveInProgress;
+    private int _standaloneCurrentHP;
+
+    public bool WaveInProgress => _waveInProgress;
+
+    public int CurrentHP =>
+        _playerHealth != null
+            ? Mathf.RoundToInt(
+                _playerHealth.CurrentHealth
+            )
+            : _standaloneCurrentHP;
 
     public int MaxHP
     {
         get
         {
-            // Base HP + flat HP bonuses.
-            int flatHP =
+            int flat =
                 _baseMaxHP +
                 SumBonuses(r => r.bonusHP);
 
-            // Percentage HP bonuses.
-            float healthPercent =
-                GetEffectValue(
-                    GearSpecialEffect.HealthPercent
-                );
-
-            float multiplier =
-                1f + healthPercent / 100f;
-
-            int finalHP = Mathf.RoundToInt(
-                flatHP * multiplier
+            float percent = GetEffectValue(
+                GearSpecialEffect.HealthPercent
             );
 
-            return Mathf.Max(1, finalHP);
+            return Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    flat * (1f + percent / 100f)
+                )
+            );
         }
     }
 
@@ -52,25 +71,20 @@ public class GearLoadout : MonoBehaviour
     {
         get
         {
-            // Base ATK + flat ATK bonuses.
-            int flatAttack =
+            int flat =
                 _baseAttack +
                 SumBonuses(r => r.bonusAttack);
 
-            // Percentage attack bonuses.
-            float attackPercent =
-                GetEffectValue(
-                    GearSpecialEffect.AttackPercent
-                );
-
-            float multiplier =
-                1f + attackPercent / 100f;
-
-            int finalAttack = Mathf.RoundToInt(
-                flatAttack * multiplier
+            float percent = GetEffectValue(
+                GearSpecialEffect.AttackPercent
             );
 
-            return Mathf.Max(0, finalAttack);
+            return Mathf.Max(
+                0,
+                Mathf.RoundToInt(
+                    flat * (1f + percent / 100f)
+                )
+            );
         }
     }
 
@@ -78,32 +92,126 @@ public class GearLoadout : MonoBehaviour
     {
         get
         {
-            // Base DEF + flat DEF bonuses.
-            int flatDefense =
+            int flat =
                 _baseDefense +
                 SumBonuses(r => r.bonusDefense);
 
-            // Percentage defense bonuses.
-            float defensePercent =
-                GetEffectValue(
-                    GearSpecialEffect.DefensePercent
-                );
-
-            float multiplier =
-                1f + defensePercent / 100f;
-
-            int finalDefense = Mathf.RoundToInt(
-                flatDefense * multiplier
+            float percent = GetEffectValue(
+                GearSpecialEffect.DefensePercent
             );
 
-            return Mathf.Max(0, finalDefense);
+            return Mathf.Max(
+                0,
+                Mathf.RoundToInt(
+                    flat * (1f + percent / 100f)
+                )
+            );
         }
     }
 
     private void Awake()
     {
-        // Start the player at full health.
-        CurrentHP = MaxHP;
+        ResolvePlayerHealth();
+
+        if (_playerHealth != null)
+        {
+            _baseMaxHP = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    _playerHealth.maxHealth
+                )
+            );
+        }
+        else
+        {
+            Debug.LogWarning(
+                "[GearLoadout] No PlayerHealth found for '" +
+                name + "'. HP buffs will only change " +
+                "the internal demo HP value.",
+                this
+            );
+        }
+
+        _standaloneCurrentHP = MaxHP;
+    }
+
+    private void ResolvePlayerHealth()
+    {
+        PlayerHealth actual =
+            GetComponent<PlayerHealth>();
+
+        if (actual == null)
+        {
+            actual =
+                GetComponentInParent<PlayerHealth>();
+        }
+
+        if (actual == null)
+        {
+            actual =
+                GetComponentInChildren<PlayerHealth>(true);
+        }
+
+        if (actual == null)
+            return;
+
+        if (_playerHealth != null &&
+            _playerHealth != actual)
+        {
+            Debug.LogWarning(
+                "[GearLoadout] PlayerHealth reference " +
+                "pointed at a different object; " +
+                "using the player's actual health.",
+                this
+            );
+        }
+
+        _playerHealth = actual;
+    }
+
+    private void Start()
+    {
+        RefreshWeaponDamage();
+    }
+
+    private void Update()
+    {
+        if (!_waveInProgress)
+            return;
+
+        int previousMaxHP = MaxHP;
+        bool expiredSomething = false;
+
+        for (int i = _effects.Count - 1; i >= 0; i--)
+        {
+            EffectInstance instance = _effects[i];
+
+            if (!instance.active ||
+                instance.reward.durationType !=
+                    GearEffectDuration.SecondsFromWaveStart)
+            {
+                continue;
+            }
+
+            instance.remainingSeconds -= Time.deltaTime;
+
+            if (instance.remainingSeconds > 0f)
+                continue;
+
+            Debug.Log(
+                "Timed effect expired: " +
+                instance.reward.rewardName,
+                this
+            );
+
+            _effects.RemoveAt(i);
+            expiredSomething = true;
+        }
+
+        if (expiredSomething)
+        {
+            RefreshStats(previousMaxHP);
+        }
     }
 
     public void Apply(GearReward reward)
@@ -111,8 +219,18 @@ public class GearLoadout : MonoBehaviour
         if (reward == null)
             return;
 
-        // Remember maximum HP before equipping.
-        int oldMaxHP = MaxHP;
+        ResolvePlayerHealth();
+
+        int previousMaxHP = MaxHP;
+
+        Debug.Log(
+            "[GearLoadout] Applying '" +
+            reward.rewardName +
+            "' (kind=" + reward.kind +
+            ", duration=" + reward.durationType +
+            ") to '" + name + "'.",
+            this
+        );
 
         if (reward.kind == RewardKind.Equipment)
         {
@@ -129,108 +247,304 @@ public class GearLoadout : MonoBehaviour
                 case GearSlot.Armor:
                     _armor = reward;
                     break;
+
+                default:
+                    Debug.LogWarning(
+                        "Unsupported gear slot for " +
+                        reward.rewardName,
+                        this
+                    );
+                    return;
             }
-
-            Debug.Log(
-                "Equipped: " + reward.rewardName
-            );
         }
-
-
-        else if (reward.kind == RewardKind.Effect)
+        else if (reward.kind == RewardKind.Effect &&
+                 HasOngoingBonus(reward))
         {
-            // Store effects that modify stats or
-            // provide permanent special abilities.
-            if (reward.bonusHP != 0 ||
-                reward.bonusAttack != 0 ||
-                reward.bonusDefense != 0 ||
-                reward.specialEffect !=
-                    GearSpecialEffect.None)
+            EffectInstance instance =
+                new EffectInstance();
+
+            instance.reward = reward;
+
+            if (reward.durationType ==
+                GearEffectDuration.Permanent)
             {
-                _permanentEffects.Add(reward);
+                instance.active = true;
+            }
+            else
+            {
+                instance.waitingForWave = true;
+                instance.active = false;
+
+                instance.remainingSeconds = Mathf.Max(
+                    0.1f,
+                    reward.durationSeconds
+                );
+
+                instance.remainingWaves = Mathf.Max(
+                    1,
+                    reward.durationWaves
+                );
             }
 
+            _effects.Add(instance);
+
             Debug.Log(
-                "Effect applied: " + reward.rewardName
+                "Effect obtained: " +
+                reward.rewardName +
+                (instance.waitingForWave
+                    ? " (activates next wave)"
+                    : " (active now)"),
+                this
             );
         }
 
-        // Recalculate max health after reward.
+        RefreshStats(
+            previousMaxHP,
+            reward.restoreHP
+        );
+    }
+
+
+    [ContextMenu("Test/Start Wave")]
+    public void OnWaveStarted()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (_waveInProgress)
+        {
+            Debug.LogWarning(
+                "GearLoadout: Wave start received " +
+                "while a wave is active.",
+                this
+            );
+            return;
+        }
+
+        int previousMaxHP = MaxHP;
+
+        _waveInProgress = true;
+
+        foreach (EffectInstance instance in _effects)
+        {
+            if (!instance.waitingForWave)
+                continue;
+
+            instance.waitingForWave = false;
+            instance.active = true;
+
+            if (instance.reward.durationType ==
+                GearEffectDuration.SecondsFromWaveStart)
+            {
+                instance.remainingSeconds = Mathf.Max(
+                    0.1f,
+                    instance.reward.durationSeconds
+                );
+            }
+            else if (instance.reward.durationType ==
+                     GearEffectDuration.NumberOfWaves)
+            {
+                instance.remainingWaves = Mathf.Max(
+                    1,
+                    instance.reward.durationWaves
+                );
+            }
+
+            Debug.Log(
+                "Effect activated: " +
+                instance.reward.rewardName,
+                this
+            );
+        }
+
+        RefreshStats(previousMaxHP);
+    }
+
+
+    [ContextMenu("Test/End Wave")]
+    public void OnWaveEnded()
+    {
+        if (!Application.isPlaying ||
+            !_waveInProgress)
+        {
+            return;
+        }
+
+        int previousMaxHP = MaxHP;
+
+        _waveInProgress = false;
+
+        for (int i = _effects.Count - 1; i >= 0; i--)
+        {
+            EffectInstance instance = _effects[i];
+
+            if (!instance.active)
+                continue;
+
+            if (instance.reward.durationType ==
+                GearEffectDuration.SecondsFromWaveStart)
+            {
+                Debug.Log(
+                    "Wave ended; timed effect expired: " +
+                    instance.reward.rewardName,
+                    this
+                );
+
+                _effects.RemoveAt(i);
+            }
+            else if (instance.reward.durationType ==
+                     GearEffectDuration.NumberOfWaves)
+            {
+                instance.remainingWaves--;
+
+                if (instance.remainingWaves <= 0)
+                {
+                    Debug.Log(
+                        "Wave-count effect expired: " +
+                        instance.reward.rewardName,
+                        this
+                    );
+
+                    _effects.RemoveAt(i);
+                }
+            }
+        }
+
+        RefreshStats(previousMaxHP);
+    }
+
+    private void RefreshStats(
+        int previousMaxHP,
+        int instantHealing = 0)
+    {
+        ResolvePlayerHealth();
+
         int newMaxHP = MaxHP;
 
-        // Gain the HP added by an upgrade.
-        int extraMaxHP = Mathf.Max(
+        int gainedMaxHP = Mathf.Max(
             0,
-            newMaxHP - oldMaxHP
+            newMaxHP - previousMaxHP
         );
 
-        // Add extra HP and immediate healing.
-        CurrentHP = Mathf.Clamp(
-            CurrentHP + extraMaxHP + reward.restoreHP,
-            0,
-            newMaxHP
-        );
+        if (_playerHealth != null)
+        {
+            float beforeRealHP =
+                _playerHealth.maxHealth;
+
+            _playerHealth.SetMaxHealth(
+                newMaxHP,
+                false
+            );
+
+            Debug.Log(
+                "[GearLoadout] PlayerHealth.maxHealth " +
+                beforeRealHP + " -> " +
+                _playerHealth.maxHealth +
+                " on '" + _playerHealth.name + "'.",
+                this
+            );
+
+            if (gainedMaxHP > 0 ||
+                instantHealing > 0)
+            {
+                _playerHealth.Heal(
+                    gainedMaxHP + instantHealing
+                );
+            }
+        }
+        else
+        {
+            _standaloneCurrentHP = Mathf.Clamp(
+                _standaloneCurrentHP +
+                gainedMaxHP +
+                instantHealing,
+                0,
+                newMaxHP
+            );
+
+            Debug.LogWarning(
+                "[GearLoadout] No PlayerHealth linked. " +
+                "Real player HP was not updated!",
+                this
+            );
+        }
+
+        RefreshWeaponDamage();
 
         Debug.Log(
-            "Reward applied: " + reward.rewardName +
-            " | HP " + CurrentHP + "/" + MaxHP +
+            "GearLoadout stats | HP " +
+            CurrentHP + "/" + MaxHP +
             " | ATK " + Attack +
-            " | DEF " + Defense
+            " | DEF " + Defense,
+            this
         );
+    }
 
-        // Display active percentage bonuses.
-        Debug.Log(
-            "ATK Bonus: " +
-            GetEffectValue(
-                GearSpecialEffect.AttackPercent
-            ) + "%" +
-            " | DEF Bonus: " +
-            GetEffectValue(
-                GearSpecialEffect.DefensePercent
-            ) + "%" +
-            " | HP Bonus: " +
-            GetEffectValue(
-                GearSpecialEffect.HealthPercent
-            ) + "%"
-        );
+    public void RefreshWeaponDamage()
+    {
+        GearDamage[] sources =
+            _weaponDamageSources;
+
+        if (sources == null ||
+            sources.Length == 0)
+        {
+            sources =
+                GetComponentsInChildren<GearDamage>(true);
+        }
+
+        if (sources.Length == 0)
+        {
+            Debug.LogWarning(
+                "[GearLoadout] No GearDamage components " +
+                "found under '" + name +
+                "'. Assign Weapon Damage Sources " +
+                "to make ATK affect hits.",
+                this
+            );
+        }
+
+        foreach (GearDamage source in sources)
+        {
+            if (source != null)
+            {
+                source.damage = Attack;
+            }
+        }
     }
 
     public float GetEffectValue(
         GearSpecialEffect effectType)
     {
-        float total = 0f;
-
         if (effectType == GearSpecialEffect.None)
             return 0f;
 
-        // Check sword effects.
+        float total = 0f;
+
         if (_sword != null &&
             _sword.specialEffect == effectType)
         {
             total += _sword.effectValue;
         }
 
-        // Check shield effects.
         if (_shield != null &&
             _shield.specialEffect == effectType)
         {
             total += _shield.effectValue;
         }
 
-        // Check armor effects.
         if (_armor != null &&
             _armor.specialEffect == effectType)
         {
             total += _armor.effectValue;
         }
 
-        // Check permanent effects.
-        foreach (GearReward effect in _permanentEffects)
+        foreach (EffectInstance instance in _effects)
         {
-            if (effect != null &&
-                effect.specialEffect == effectType)
+            if (instance.active &&
+                instance.reward != null &&
+                instance.reward.specialEffect == effectType)
             {
-                total += effect.effectValue;
+                total += instance.reward.effectValue;
             }
         }
 
@@ -242,33 +556,33 @@ public class GearLoadout : MonoBehaviour
     {
         int total = 0;
 
-        // Sword bonuses.
         if (_sword != null)
-        {
             total += readStat(_sword);
-        }
 
-        // Shield bonuses.
         if (_shield != null)
-        {
             total += readStat(_shield);
-        }
 
-        // Armor bonuses.
         if (_armor != null)
-        {
             total += readStat(_armor);
-        }
 
-        // Permanent effect bonuses.
-        foreach (GearReward effect in _permanentEffects)
+        foreach (EffectInstance instance in _effects)
         {
-            if (effect != null)
+            if (instance.active &&
+                instance.reward != null)
             {
-                total += readStat(effect);
+                total += readStat(instance.reward);
             }
         }
 
         return total;
+    }
+
+    private static bool HasOngoingBonus(
+        GearReward reward)
+    {
+        return reward.bonusHP != 0 ||
+               reward.bonusAttack != 0 ||
+               reward.bonusDefense != 0 ||
+               reward.specialEffect != GearSpecialEffect.None;
     }
 }

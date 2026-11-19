@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Juggernaut
   m_EditorClassIdentifier: Assembly-CSharp::GearReward
   rewardName: Juggernaut
-  description: +30% Health
+  description: 'Lasts for 20 seconds from start of next round. '
   kind: 1
   rarity: 1
   slot: 3
@@ -21,7 +21,10 @@ MonoBehaviour:
   equipmentPrefab: {fileID: 0}
   bonusHP: 0
   bonusAttack: 15
-  bonusDefense: 0
-  specialEffect: 9
+  bonusDefense: 5
+  specialEffect: 8
   effectValue: 30
+  durationType: 1
+  durationSeconds: 20
+  durationWaves: 1
   restoreHP: 0

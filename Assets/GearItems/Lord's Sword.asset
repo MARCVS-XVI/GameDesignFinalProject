@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Lord's Sword
   m_EditorClassIdentifier: Assembly-CSharp::GearReward
   rewardName: Lord's Sword
-  description: +50% Crit
+  description: 
   kind: 0
   rarity: 3
   slot: 0
@@ -24,4 +24,7 @@ MonoBehaviour:
   bonusDefense: 0
   specialEffect: 2
   effectValue: 50
+  durationType: 0
+  durationSeconds: 15
+  durationWaves: 2
   restoreHP: 0

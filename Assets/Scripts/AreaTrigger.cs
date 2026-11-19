@@ -3,69 +3,75 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class AreaTrigger : MonoBehaviour
 {
-    public int levelIndex; // index of level this area belongs to
-    public Door[] doorsToClose; // doors that shut behind player
+    [SerializeField]
+    private GearPullManager _gearPullManager;
 
-    [Header("Debug")]
-    public bool debugLogs = true;
-    private bool handled = false;
+    [SerializeField]
+    private GearPullManager.GameArea _area =
+        GearPullManager.GameArea.CastleInterior;
 
-    // initialize the area trigger component
-    void Start()
+    [Header("Optional Wave Manager")]
+    [SerializeField]
+    private WaveManager _waveManager;
+
+    [SerializeField]
+    private bool _debugLogs = true;
+
+    private void Reset()
     {
-        // ensure the collider is set as a trigger so it can detect the player entering the area
-        Collider col = GetComponent<Collider>();
-        if (!col.isTrigger)
-            Debug.LogWarning("[AreaTrigger] '" + name + "': collider is not a trigger. Tick Is Trigger.", this);
+        Collider collider = GetComponent<Collider>();
 
-        if (transform.lossyScale != Vector3.one)
-            Debug.LogWarning("[AreaTrigger] '" + name + "': scale is " + transform.lossyScale + ". Large scales make the zone bigger than it looks.", this);
+        if (collider != null)
+            collider.isTrigger = true;
     }
 
-    // handle player entering, staying, and exiting the area
-    void OnTriggerEnter(Collider other) { Handle(other); }
-    void OnTriggerStay(Collider other)  { Handle(other); }
-
-    // handle player exiting the area
-    void OnTriggerExit(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player"))
-            handled = false;
-    }
-
-    // handle the logic above
-    private void Handle(Collider other)
-    {
-        if (handled) return;
-        if (!other.CompareTag("Player")) return;
-
-        if (WaveManager.Instance == null)
+        if (other.GetComponentInParent<PlayerController>() == null &&
+            other.GetComponentInParent<PlayerHealth>() == null)
         {
-            Debug.LogError("[AreaTrigger] WaveManager.Instance is null.", this);
             return;
         }
 
-        if (!WaveManager.Instance.IsAwaitingArea(levelIndex))
-            return;
+        WaveManager manager = _waveManager != null
+            ? _waveManager
+            : WaveManager.Instance;
 
-        handled = true;
-        if (debugLogs)
-            Debug.Log("[AreaTrigger] '" + name + "' entered by '" + other.name + "' (level " + levelIndex + ")", this);
-
-        foreach (Door d in doorsToClose)
+        if (manager == null)
         {
-            if (d == null)
-                Debug.LogWarning("[AreaTrigger] '" + name + "' has an empty slot in Doors To Close.", this);
-            else
-                d.Close();
+            Debug.LogError(
+                "[AreaTrigger] No WaveManager found.",
+                this
+            );
+            return;
         }
 
-        WaveManager.Instance.PlayerEnteredArea(levelIndex);
-    }
+        int levelIndex = (int)_area;
 
-    // reset the collider to be a trigger
-    void Reset()
-    {
-        GetComponent<Collider>().isTrigger = true;
+        bool expected =
+            manager.IsAwaitingArea(levelIndex);
+
+        if (_debugLogs)
+        {
+            Debug.Log(
+                "[AreaTrigger] Player entered '" +
+                name + "'. Destination=" + _area +
+                ", expected by WaveManager=" + expected,
+                this
+            );
+        }
+
+        manager.PlayerEnteredArea(levelIndex);
+
+        if (!expected)
+            return;
+
+        GearPullManager pull =
+            _gearPullManager != null
+                ? _gearPullManager
+                : manager.gearPullManager;
+
+        if (pull != null)
+            pull.SetArea(_area);
     }
 }

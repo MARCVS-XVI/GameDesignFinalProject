@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class GearPullManager : MonoBehaviour
 {
@@ -65,18 +64,21 @@ public class GearPullManager : MonoBehaviour
 
     [Header("Rewards")]
     [SerializeField] private GearReward[] _rewardPool;
+
     [SerializeField] private GearLoadout _demoLoadout;
+
     [SerializeField] private bool _offerGearAndEffect = true;
 
-    [Header("Unity Scene Names")]
+    [Header("Current Area (Single Scene)")]
     [SerializeField]
-    private string _castleExteriorScene = "CastleExterior";
+    private GameArea _startingArea =
+        GameArea.CastleExterior;
 
-    [SerializeField]
-    private string _castleInteriorScene = "CastleInterior";
-
-    [SerializeField]
-    private string _throneRoomScene = "ThroneRoom";
+    public GameArea CurrentArea
+    {
+        get;
+        private set;
+    }
 
     [Header("Castle Exterior Rarity Chances (%)")]
     [SerializeField]
@@ -97,45 +99,108 @@ public class GearPullManager : MonoBehaviour
     [Min(1)]
     [SerializeField]
     private int _skipsForGuaranteedHighRarity = 2;
+
     public event Action<GearReward> RewardSelected;
     public event Action<bool> PullClosed;
+
     public bool IsOpen => _isOpen;
     public int ConsecutiveSkips => _consecutiveSkips;
+
     private readonly List<GearReward> _offered =
         new List<GearReward>();
+
     private bool _isOpen;
     private int _consecutiveSkips;
     private float _oldTimeScale = 1f;
-    private bool _hasAreaOverride;
-    private GameArea _areaOverride;
+
+    public GearLoadout PlayerLoadout => _demoLoadout;
+
+    public void SetPlayerLoadout(
+        GearLoadout playerLoadout)
+    {
+        if (playerLoadout == null)
+        {
+            Debug.LogError(
+                "GearPullManager: Cannot bind a null player GearLoadout.",
+                this
+            );
+            return;
+        }
+
+        if (_demoLoadout != null &&
+            _demoLoadout != playerLoadout)
+        {
+            Debug.LogWarning(
+                "GearPullManager: Replacing a different Demo Loadout " +
+                "reference with the real player's GearLoadout.",
+                this
+            );
+        }
+
+        _demoLoadout = playerLoadout;
+
+        Debug.Log(
+            "[GearPullManager] Rewards target: " +
+            _demoLoadout.name,
+            this
+        );
+    }
 
     public void SetArea(GameArea area)
     {
-        _hasAreaOverride = true;
-        _areaOverride = area;
+        if (!Enum.IsDefined(typeof(GameArea), area))
+        {
+            Debug.LogWarning(
+                "GearPullManager: Invalid area " + area,
+                this
+            );
+            return;
+        }
+
+        CurrentArea = area;
+
+        Debug.Log(
+            "GearPullManager: Current area is " +
+            CurrentArea,
+            this
+        );
     }
 
     public void ClearAreaOverride()
     {
-        _hasAreaOverride = false;
+        SetArea(_startingArea);
+    }
+
+    [ContextMenu("Set Area/Castle Exterior")]
+    public void SetCastleExterior()
+    {
+        SetArea(GameArea.CastleExterior);
+    }
+
+    [ContextMenu("Set Area/Castle Interior")]
+    public void SetCastleInterior()
+    {
+        SetArea(GameArea.CastleInterior);
+    }
+
+    [ContextMenu("Set Area/Throne Room")]
+    public void SetThroneRoom()
+    {
+        SetArea(GameArea.ThroneRoom);
     }
 
     private void Awake()
     {
         if (_gearPullPanel != null)
-        {
             _gearPullPanel.SetActive(false);
-        }
 
-        SetArea(GameArea.CastleExterior);
+        SetArea(_startingArea);
     }
 
     private void OnDisable()
     {
         if (_isOpen && _pauseGameplay)
-        {
             Time.timeScale = _oldTimeScale;
-        }
 
         _isOpen = false;
     }
@@ -152,21 +217,18 @@ public class GearPullManager : MonoBehaviour
             Debug.LogError(
                 "GearPullManager: Assign the panel and cards."
             );
-
             return;
         }
 
-        if (!TryGetArea(out GameArea area))
-            return;
+        GameArea area = CurrentArea;
 
         RarityRates rates = GetRates(area);
 
         if (rates.Total != 100)
         {
             Debug.LogWarning(
-                "GearPullManager: Area rates do not add " +
-                "up to 100. They will be treated as " +
-                "relative weights."
+                "GearPullManager: Area rates do not add up " +
+                "to 100. They will be treated as relative weights."
             );
         }
 
@@ -188,10 +250,8 @@ public class GearPullManager : MonoBehaviour
         if (available.Count == 0)
         {
             Debug.LogError(
-                "GearPullManager: Add GearReward " +
-                "assets to the Reward Pool."
+                "GearPullManager: Add GearReward assets to the Reward Pool."
             );
-
             return;
         }
 
@@ -199,10 +259,9 @@ public class GearPullManager : MonoBehaviour
             reward => rates.GetWeight(reward.rarity) > 0))
         {
             Debug.LogError(
-                "GearPullManager: No eligible rewards " +
-                "for area " + area
+                "GearPullManager: No eligible rewards for area " +
+                area
             );
-
             return;
         }
 
@@ -221,8 +280,7 @@ public class GearPullManager : MonoBehaviour
             if (_offered.Count == 0)
             {
                 Debug.LogWarning(
-                    "GearPullManager: No eligible " +
-                    "Legendary or Mythic reward found."
+                    "GearPullManager: No eligible Legendary or Mythic reward found."
                 );
             }
         }
@@ -268,7 +326,6 @@ public class GearPullManager : MonoBehaviour
             Debug.LogError(
                 "GearPullManager: Failed to roll rewards."
             );
-
             return;
         }
 
@@ -279,7 +336,9 @@ public class GearPullManager : MonoBehaviour
 
             bool hasReward = i < _offered.Count;
 
-            _cards[i].gameObject.SetActive(hasReward);
+            _cards[i].gameObject.SetActive(
+                hasReward
+            );
 
             if (hasReward)
             {
@@ -290,18 +349,17 @@ public class GearPullManager : MonoBehaviour
             }
         }
 
-        Debug.Log("Gear Pull area: " + area);
+        Debug.Log(
+            "Gear Pull area: " + area
+        );
 
         _oldTimeScale = Time.timeScale;
-
         _isOpen = true;
 
         _gearPullPanel.SetActive(true);
 
         if (_pauseGameplay)
-        {
             Time.timeScale = 0f;
-        }
     }
 
     public void SelectReward(GearReward reward)
@@ -313,15 +371,31 @@ public class GearPullManager : MonoBehaviour
             return;
         }
 
-        _consecutiveSkips = 0;
-
-        if (_demoLoadout != null)
+        if (_demoLoadout == null)
         {
-            _demoLoadout.Apply(reward);
+            Debug.LogError(
+                "GearPullManager: No Player GearLoadout assigned! " +
+                "Assign the real Player or let WaveManager bind it.",
+                this
+            );
+            return;
         }
 
+        _consecutiveSkips = 0;
+
+        _demoLoadout.Apply(reward);
+
         Debug.Log(
-            "Chosen reward: " + reward.rewardName
+            "[GearPullManager] Applied '" +
+            reward.rewardName +
+            "' to player '" +
+            _demoLoadout.name + "'.",
+            this
+        );
+
+        Debug.Log(
+            "Chosen reward: " +
+            reward.rewardName
         );
 
         RewardSelected?.Invoke(reward);
@@ -338,7 +412,6 @@ public class GearPullManager : MonoBehaviour
                 "GearPullManager: Invalid reward index: " +
                 rewardIndex
             );
-
             return;
         }
 
@@ -368,12 +441,11 @@ public class GearPullManager : MonoBehaviour
         _isOpen = false;
 
         _gearPullPanel.SetActive(false);
+
         HideOpenButton();
 
         if (_pauseGameplay)
-        {
             Time.timeScale = _oldTimeScale;
-        }
 
         PullClosed?.Invoke(skipped);
 
@@ -489,7 +561,9 @@ public class GearPullManager : MonoBehaviour
             }
         }
 
-        return eligible[eligible.Count - 1];
+        return eligible[
+            eligible.Count - 1
+        ];
     }
 
     private static bool HasRarity(
@@ -499,9 +573,7 @@ public class GearPullManager : MonoBehaviour
         foreach (GearReward reward in rewards)
         {
             if (reward.rarity == rarity)
-            {
                 return true;
-            }
         }
 
         return false;
@@ -514,56 +586,14 @@ public class GearPullManager : MonoBehaviour
         foreach (GearReward reward in rewards)
         {
             if (reward.kind == kind)
-            {
                 return true;
-            }
         }
 
         return false;
     }
 
-    private bool TryGetArea(out GameArea area)
-    {
-        if (_hasAreaOverride)
-        {
-            area = _areaOverride;
-            return true;
-        }
-
-        string sceneName =
-            SceneManager.GetActiveScene().name;
-
-        if (sceneName == _castleExteriorScene)
-        {
-            area = GameArea.CastleExterior;
-            return true;
-        }
-
-        if (sceneName == _castleInteriorScene)
-        {
-            area = GameArea.CastleInterior;
-            return true;
-        }
-
-        if (sceneName == _throneRoomScene)
-        {
-            area = GameArea.ThroneRoom;
-            return true;
-        }
-
-        area = default(GameArea);
-
-        Debug.LogError(
-            "GearPullManager: Scene '" + sceneName +
-            "' is not mapped to an area. " +
-            "Set the scene names in the Inspector " +
-            "or call SetArea()."
-        );
-
-        return false;
-    }
-
-    private RarityRates GetRates(GameArea area)
+    private RarityRates GetRates(
+        GameArea area)
     {
         switch (area)
         {
@@ -580,6 +610,7 @@ public class GearPullManager : MonoBehaviour
                 return _exteriorRates;
         }
     }
+
     public void ShowOpenButton()
     {
         if (_openButton != null)
@@ -595,5 +626,4 @@ public class GearPullManager : MonoBehaviour
             _openButton.SetActive(false);
         }
     }
-
-    }
+}
